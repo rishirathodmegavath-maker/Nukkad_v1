@@ -20,7 +20,7 @@ import {
 import { getAccountPrivacy, updateAccountPrivacy } from '@/services/account-privacy.service'
 import { clearSession } from '@/lib/session'
 import { cn } from '@/lib/utils'
-import { useUiStore, type ThemePreference } from '@/store/ui.store'
+import { useThemeStore, type ThemePreference } from '@/store/theme.store'
 import type { AccountPrivacySettings, ConnectPermission, MessagePermission, ProfileVisibility } from '@/types'
 import { PageHeader } from '@/components/domain/PageHeader'
 import { Card } from '@/components/ui/Card'
@@ -439,8 +439,8 @@ function AccountPrivacySection() {
 }
 
 function AppearanceSection() {
-  const themePreference = useUiStore((s) => s.themePreference)
-  const setThemePreference = useUiStore((s) => s.setThemePreference)
+  const themePreference = useThemeStore((s) => s.themePreference)
+  const setThemePreference = useThemeStore((s) => s.setThemePreference)
 
   return (
     <Card>

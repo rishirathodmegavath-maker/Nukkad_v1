@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { Menu, Search, Bell, MessageSquare, Sun, Moon, User, Settings, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useUiStore } from '@/store/ui.store'
+import { useThemeStore } from '@/store/theme.store'
 import { useAuthStore } from '@/store/auth.store'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useUnreadNotificationCount } from '@/hooks/useNotifications'
@@ -24,8 +25,9 @@ export function Topbar() {
   const setMobileNavOpen = useUiStore((s) => s.setMobileNavOpen)
   const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed)
   const toggleSidebar = useUiStore((s) => s.toggleSidebar)
-  const theme = useUiStore((s) => s.theme)
-  const toggleTheme = useUiStore((s) => s.toggleTheme)
+  const theme = useThemeStore((s) => s.theme)
+  const setThemePreference = useThemeStore((s) => s.setThemePreference)
+  const toggleTheme = () => setThemePreference(theme === 'dark' ? 'light' : 'dark')
   const logout = useAuthStore((s) => s.logout)
   const { data: currentUser } = useCurrentUser()
   const { data: unreadNotifs = 0 } = useUnreadNotificationCount()

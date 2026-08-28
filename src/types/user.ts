@@ -139,6 +139,36 @@ export interface AccountPrivacySettings {
   connectPermission: ConnectPermission
 }
 
+export type ThemeModePreference = 'LIGHT' | 'DARK' | 'SYSTEM'
+export type ThemePresetId =
+  | 'NUKKAD_INDIGO'
+  | 'OCEAN_BLUE'
+  | 'TEAL'
+  | 'EMERALD'
+  | 'VIOLET'
+  | 'PURPLE'
+  | 'ROSE'
+  | 'AMBER'
+  | 'ORANGE'
+  | 'RED'
+  | 'PINK'
+  | 'CYAN'
+  | 'SLATE'
+  | 'NEUTRAL'
+  | 'CUSTOM'
+
+export interface AppearanceSettings {
+  themeMode: ThemeModePreference
+  themePreset: ThemePresetId
+  customPrimaryColor: string | null
+  sidebarColor: string | null
+  pageBgColor: string | null
+  cardBgColor: string | null
+  headerBgColor: string | null
+  borderColor: string | null
+  secondarySurfaceColor: string | null
+}
+
 export type RecommendationStatus = 'PENDING' | 'APPROVED' | 'REJECTED'
 
 export interface Recommendation {
