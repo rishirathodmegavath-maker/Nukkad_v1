@@ -24,6 +24,7 @@ import { useThemeStore, type ThemePreference } from '@/store/theme.store'
 import { PresetGrid } from '@/components/settings/appearance/PresetGrid'
 import { ColorPickerPanel } from '@/components/settings/appearance/ColorPickerPanel'
 import { AdvancedCustomizationPanel } from '@/components/settings/appearance/AdvancedCustomizationPanel'
+import { LivePreviewPanel } from '@/components/settings/appearance/LivePreviewPanel'
 import type { AccountPrivacySettings, ConnectPermission, MessagePermission, ProfileVisibility } from '@/types'
 import { PageHeader } from '@/components/domain/PageHeader'
 import { Card } from '@/components/ui/Card'
@@ -460,6 +461,12 @@ function AppearanceSection() {
 
   return (
     <div className="flex flex-col gap-6">
+      <Card>
+        <h2 className="font-semibold text-fg mb-1">Preview</h2>
+        <p className="text-sm text-fg-muted mb-4">Updates instantly as you change anything below.</p>
+        <LivePreviewPanel />
+      </Card>
+
       <Card>
         <h2 className="font-semibold text-fg mb-1">Appearance</h2>
         <p className="text-sm text-fg-muted mb-3">Choose how Nukkad looks on this device.</p>
