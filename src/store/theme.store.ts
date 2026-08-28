@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { applyBrandOverride, type ThemeMode } from '@/lib/theme/apply'
+import { resolvePresetBaseColor } from '@/lib/theme/presets'
 import { resetAppearanceSettings, updateAppearanceSettings } from '@/services/appearance.service'
 import type { AppearanceSettings, ThemePresetId } from '@/types'
 
@@ -88,8 +89,7 @@ function getStoredRecentColors(): string[] {
 
 /** Applies the effective brand colour (preset default = no override, i.e. shipped Nukkad Indigo) + advanced overrides for the given mode. */
 function applyEffectiveTheme(mode: ThemeMode, preset: ThemePresetId, customPrimaryColor: string | null, overrides: AdvancedOverrides) {
-  const baseColor = preset === 'CUSTOM' ? customPrimaryColor : null
-  applyBrandOverride(baseColor, mode)
+  applyBrandOverride(resolvePresetBaseColor(preset, customPrimaryColor), mode)
 
   const root = document.documentElement.style
   const advancedMap: [keyof AdvancedOverrides, string][] = [
@@ -116,6 +116,7 @@ interface ThemeState {
   recentColors: string[]
   hydrated: boolean
   setThemePreference: (preference: ThemePreference) => void
+  setPreset: (preset: ThemePresetId) => void
   hydrateFromServer: (settings: AppearanceSettings) => void
   addRecentColor: (hex: string) => void
   clearRecentColors: () => void
@@ -145,6 +146,17 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
 
     const backendMode = preference.toUpperCase() as 'LIGHT' | 'DARK' | 'SYSTEM'
     updateAppearanceSettings({ themeMode: backendMode }).catch(() => {
+      // Not fatal — localStorage still holds the preference for this device.
+    })
+  },
+
+  setPreset: (preset) => {
+    const { theme, customPrimaryColor, overrides } = get()
+    applyEffectiveTheme(theme, preset, customPrimaryColor, overrides)
+    cacheAppearance({ preset, customPrimaryColor, overrides })
+    set({ preset })
+
+    updateAppearanceSettings({ themePreset: preset }).catch(() => {
       // Not fatal — localStorage still holds the preference for this device.
     })
   },

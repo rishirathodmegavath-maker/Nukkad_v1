@@ -21,6 +21,7 @@ import { getAccountPrivacy, updateAccountPrivacy } from '@/services/account-priv
 import { clearSession } from '@/lib/session'
 import { cn } from '@/lib/utils'
 import { useThemeStore, type ThemePreference } from '@/store/theme.store'
+import { PresetGrid } from '@/components/settings/appearance/PresetGrid'
 import type { AccountPrivacySettings, ConnectPermission, MessagePermission, ProfileVisibility } from '@/types'
 import { PageHeader } from '@/components/domain/PageHeader'
 import { Card } from '@/components/ui/Card'
@@ -443,22 +444,30 @@ function AppearanceSection() {
   const setThemePreference = useThemeStore((s) => s.setThemePreference)
 
   return (
-    <Card>
-      <h2 className="font-semibold text-fg mb-1">Appearance</h2>
-      <p className="text-sm text-fg-muted mb-3">Choose how Nukkad looks on this device.</p>
-      <div className="flex items-center justify-between gap-3 py-3">
-        <span className="text-sm font-medium text-fg">Theme</span>
-        <PrivacyPillGroup<ThemePreference>
-          value={themePreference}
-          options={[
-            { value: 'light', label: 'Light' },
-            { value: 'dark', label: 'Dark' },
-            { value: 'system', label: 'System' },
-          ]}
-          onChange={setThemePreference}
-        />
-      </div>
-    </Card>
+    <div className="flex flex-col gap-6">
+      <Card>
+        <h2 className="font-semibold text-fg mb-1">Appearance</h2>
+        <p className="text-sm text-fg-muted mb-3">Choose how Nukkad looks on this device.</p>
+        <div className="flex items-center justify-between gap-3 py-3">
+          <span className="text-sm font-medium text-fg">Theme</span>
+          <PrivacyPillGroup<ThemePreference>
+            value={themePreference}
+            options={[
+              { value: 'light', label: 'Light' },
+              { value: 'dark', label: 'Dark' },
+              { value: 'system', label: 'System' },
+            ]}
+            onChange={setThemePreference}
+          />
+        </div>
+      </Card>
+
+      <Card>
+        <h2 className="font-semibold text-fg mb-1">Theme colour</h2>
+        <p className="text-sm text-fg-muted mb-4">Pick a professionally designed accent colour for buttons, links, and active states.</p>
+        <PresetGrid />
+      </Card>
+    </div>
   )
 }
 
