@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import { applyBrandOverride, type ThemeMode } from '@/lib/theme/apply'
 import { resolvePresetBaseColor } from '@/lib/theme/presets'
-import { resetAppearanceSettings, updateAppearanceSettings } from '@/services/appearance.service'
+import { clearAdvancedOverrides as clearAdvancedOverridesApi, resetAppearanceSettings, updateAppearanceSettings } from '@/services/appearance.service'
 import type { AppearanceSettings, ThemePresetId } from '@/types'
 
 export type ThemePreference = 'light' | 'dark' | 'system'
@@ -98,7 +98,7 @@ function applyEffectiveTheme(mode: ThemeMode, preset: ThemePresetId, customPrima
     ['sidebarColor', '--nav-surface'],
     ['pageBgColor', '--surface-canvas'],
     ['cardBgColor', '--surface-base'],
-    ['headerBgColor', '--nav-surface'],
+    ['headerBgColor', '--header-surface'],
     ['borderColor', '--border-default'],
     ['secondarySurfaceColor', '--surface-sunken'],
   ]
@@ -120,10 +120,13 @@ interface ThemeState {
   setThemePreference: (preference: ThemePreference) => void
   setPreset: (preset: ThemePresetId) => void
   setCustomColor: (hex: string) => void
+  setAdvancedOverride: (key: keyof AdvancedOverrides, hex: string) => void
   hydrateFromServer: (settings: AppearanceSettings) => void
   addRecentColor: (hex: string) => void
   clearRecentColors: () => void
   resetToDefault: () => Promise<void>
+  resetTheme: () => void
+  resetCustomisation: () => Promise<void>
 }
 
 const initialPreference = getStoredPreference()
@@ -178,6 +181,18 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     }, 400)
   },
 
+  setAdvancedOverride: (key, hex) => {
+    const { theme, preset, customPrimaryColor, overrides } = get()
+    const nextOverrides = { ...overrides, [key]: hex }
+    applyEffectiveTheme(theme, preset, customPrimaryColor, nextOverrides)
+    cacheAppearance({ preset, customPrimaryColor, overrides: nextOverrides })
+    set({ overrides: nextOverrides })
+
+    updateAppearanceSettings({ [key]: hex }).catch(() => {
+      // Not fatal — localStorage still holds the preference for this device.
+    })
+  },
+
   hydrateFromServer: (settings) => {
     const overrides: AdvancedOverrides = {
       sidebarColor: settings.sidebarColor,
@@ -219,6 +234,24 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
 
   resetToDefault: async () => {
     const settings = await resetAppearanceSettings()
+    get().hydrateFromServer(settings)
+  },
+
+  /** "Reset Theme" — back to Nukkad Indigo, keeping mode and advanced overrides untouched. */
+  resetTheme: () => {
+    const { theme, overrides } = get()
+    applyEffectiveTheme(theme, 'NUKKAD_INDIGO', null, overrides)
+    cacheAppearance({ preset: 'NUKKAD_INDIGO', customPrimaryColor: null, overrides })
+    set({ preset: 'NUKKAD_INDIGO', customPrimaryColor: null })
+
+    updateAppearanceSettings({ themePreset: 'NUKKAD_INDIGO' }).catch(() => {
+      // Not fatal — localStorage still holds the preference for this device.
+    })
+  },
+
+  /** "Reset Customisation" — clears only the 6 advanced-override colours. */
+  resetCustomisation: async () => {
+    const settings = await clearAdvancedOverridesApi()
     get().hydrateFromServer(settings)
   },
 }))

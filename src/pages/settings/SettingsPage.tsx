@@ -23,6 +23,7 @@ import { cn } from '@/lib/utils'
 import { useThemeStore, type ThemePreference } from '@/store/theme.store'
 import { PresetGrid } from '@/components/settings/appearance/PresetGrid'
 import { ColorPickerPanel } from '@/components/settings/appearance/ColorPickerPanel'
+import { AdvancedCustomizationPanel } from '@/components/settings/appearance/AdvancedCustomizationPanel'
 import type { AccountPrivacySettings, ConnectPermission, MessagePermission, ProfileVisibility } from '@/types'
 import { PageHeader } from '@/components/domain/PageHeader'
 import { Card } from '@/components/ui/Card'
@@ -443,6 +444,19 @@ function AccountPrivacySection() {
 function AppearanceSection() {
   const themePreference = useThemeStore((s) => s.themePreference)
   const setThemePreference = useThemeStore((s) => s.setThemePreference)
+  const resetTheme = useThemeStore((s) => s.resetTheme)
+  const resetToDefault = useThemeStore((s) => s.resetToDefault)
+  const [restoringDefault, setRestoringDefault] = useState(false)
+
+  async function handleRestoreDefault() {
+    setRestoringDefault(true)
+    try {
+      await resetToDefault()
+      toast.success('Restored Nukkad default appearance')
+    } finally {
+      setRestoringDefault(false)
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
@@ -464,7 +478,12 @@ function AppearanceSection() {
       </Card>
 
       <Card>
-        <h2 className="font-semibold text-fg mb-1">Theme colour</h2>
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="font-semibold text-fg">Theme colour</h2>
+          <button type="button" onClick={resetTheme} className="text-xs font-medium text-fg-muted hover:text-fg cursor-pointer">
+            Reset theme
+          </button>
+        </div>
         <p className="text-sm text-fg-muted mb-4">Pick a professionally designed accent colour for buttons, links, and active states.</p>
         <PresetGrid />
       </Card>
@@ -474,6 +493,19 @@ function AppearanceSection() {
         <p className="text-sm text-fg-muted mb-4">Or choose your own — Nukkad generates a complete, accessible palette from it automatically.</p>
         <ColorPickerPanel />
       </Card>
+
+      <Card>
+        <AdvancedCustomizationPanel />
+      </Card>
+
+      <button
+        type="button"
+        disabled={restoringDefault}
+        onClick={handleRestoreDefault}
+        className="self-start text-xs font-medium text-fg-muted hover:text-fg cursor-pointer disabled:opacity-50"
+      >
+        Reset to Nukkad Default
+      </button>
     </div>
   )
 }

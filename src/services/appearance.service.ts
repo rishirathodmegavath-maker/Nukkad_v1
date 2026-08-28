@@ -12,3 +12,7 @@ export async function updateAppearanceSettings(updates: Partial<AppearanceSettin
 export async function resetAppearanceSettings(): Promise<AppearanceSettings> {
   return apiClient.patch<AppearanceSettings>('/users/me/appearance', { resetToDefault: true })
 }
+
+export async function clearAdvancedOverrides(): Promise<AppearanceSettings> {
+  return apiClient.patch<AppearanceSettings>('/users/me/appearance', { clearAdvancedOverrides: true })
+}

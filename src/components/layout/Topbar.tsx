@@ -46,7 +46,7 @@ export function Topbar() {
   }
 
   return (
-    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border/80 bg-surface/90 backdrop-blur-md px-4 lg:px-6">
+    <header className="sticky top-0 z-30 flex h-16 items-center gap-3 border-b border-border/80 bg-header/90 backdrop-blur-md px-4 lg:px-6">
       {/* Mobile Drawer Trigger */}
       <button
         onClick={() => setMobileNavOpen(true)}
