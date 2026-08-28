@@ -4,6 +4,7 @@ import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClient } from '@/lib/query-client'
 import { useAuthStore } from '@/store/auth.store'
 import { AppRoutes } from '@/routes/AppRoutes'
+import { ErrorBoundary } from '@/components/ui/ErrorBoundary'
 
 export default function App() {
   const init = useAuthStore((s) => s.init)
@@ -18,7 +19,9 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
-        <AppRoutes />
+        <ErrorBoundary>
+          <AppRoutes />
+        </ErrorBoundary>
       </BrowserRouter>
     </QueryClientProvider>
   )

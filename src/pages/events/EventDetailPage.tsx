@@ -34,6 +34,7 @@ import {
   detectMeetingProvider,
   buildGoogleCalendarUrl,
   downloadIcsFile,
+  isPastDate,
 } from '@/lib/utils'
 import { toast } from '@/store/toast.store'
 
@@ -117,7 +118,7 @@ export default function EventDetailPage() {
   }
 
   const isFull = !event.isAttending && event.capacity !== undefined && event.attendeeCount >= event.capacity
-  const isPast = new Date(event.endAt).getTime() < Date.now()
+  const isPast = isPastDate(event.endAt)
   const spotsLeft = event.capacity ? Math.max(0, event.capacity - (event.attendeeCount ?? 0)) : null
   const capacityPercent = event.capacity ? Math.min(100, ((event.attendeeCount ?? 0) / event.capacity) * 100) : 0
 

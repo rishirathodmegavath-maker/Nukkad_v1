@@ -3,11 +3,11 @@ import { MapPin, Video, Clock, Users, CheckCircle2 } from 'lucide-react'
 import type { NukkadEvent } from '@/types'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
-import { detectMeetingProvider, formatTimeOnly } from '@/lib/utils'
+import { detectMeetingProvider, formatTimeOnly, isPastDate } from '@/lib/utils'
 
 export function EventCard({ event }: { event: NukkadEvent }) {
   const date = new Date(event.startAt)
-  const isPast = new Date(event.endAt).getTime() < Date.now()
+  const isPast = isPastDate(event.endAt)
 
   return (
     <Card

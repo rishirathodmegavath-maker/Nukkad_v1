@@ -68,6 +68,10 @@ export function formatDateOnly(iso: string) {
   })
 }
 
+export function isPastDate(iso: string) {
+  return new Date(iso).getTime() < Date.now()
+}
+
 export function buildGoogleCalendarUrl(event: {
   title: string
   description?: string
