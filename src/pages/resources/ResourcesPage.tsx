@@ -193,10 +193,11 @@ export default function ResourcesPage() {
       ) : (
         <EmptyState
           icon={<FolderOpen className="size-5" />}
-          title="No resources yet"
+          title="No resources match yet"
+          description="Pitch decks, legal templates, guidebooks, and links shared by builders will show up here."
           action={
-            <Button size="sm" onClick={() => setUploadOpen(true)}>
-              Share the first one
+            <Button size="sm" leftIcon={<Plus className="size-3.5" />} onClick={() => setUploadOpen(true)}>
+              Share a resource
             </Button>
           }
         />

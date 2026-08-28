@@ -38,7 +38,18 @@ export default function ChaptersListPage() {
           ))}
         </div>
       ) : (
-        <EmptyState icon={<MapPin className="size-5" />} title="No chapters match yet" />
+        <EmptyState
+          icon={<MapPin className="size-5" />}
+          title="No chapters match yet"
+          description="Start a chapter for your campus, city, or tech hub."
+          action={
+            <Link to="/chapters/new">
+              <Button size="sm" leftIcon={<Plus className="size-3.5" />}>
+                Create a chapter
+              </Button>
+            </Link>
+          }
+        />
       )}
     </div>
   )

@@ -148,7 +148,11 @@ export default function InvestorsListPage() {
               ))}
             </div>
           ) : (
-            <EmptyState icon={<Landmark className="size-5" />} title="No investors match yet" />
+            <EmptyState
+              icon={<Landmark className="size-5" />}
+              title="No investors match yet"
+              description="Search by firm name, sector preference, or investment thesis."
+            />
           )}
         </>
       )}
@@ -163,7 +167,10 @@ export default function InvestorsListPage() {
             ))}
           </div>
         ) : (
-          <EmptyState title="No open fundraises right now" />
+          <EmptyState
+            title="No open fundraises right now"
+            description="Startups currently raising funding rounds will be highlighted here."
+          />
         ))}
 
       {tab === 'early' && (
@@ -212,7 +219,7 @@ export default function InvestorsListPage() {
 
           {!myInvestorProfile && (
             <p className="text-sm text-fg-muted">
-              <Link to="/investors/activate" className="text-brand-600 hover:text-brand-700 font-medium">
+              <Link to="/investors/activate" className="text-fg font-semibold hover:underline">
                 Activate an investor profile
               </Link>{' '}
               to reach out to founders directly.
