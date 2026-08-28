@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Pencil, Globe } from 'lucide-react'
+import { Pencil, Globe, ChevronRight } from 'lucide-react'
 import { getInvestor } from '@/services/investors.service'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { Card } from '@/components/ui/Card'
@@ -42,9 +42,19 @@ export default function InvestorProfilePage() {
   const isOwnProfile = currentUser?.id === investor.userId
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-      <div className="lg:col-span-2 flex flex-col gap-6">
-        <Card className="flex items-start justify-between gap-5">
+    <div className="flex flex-col gap-6">
+      {/* Breadcrumb Bar */}
+      <div className="flex items-center gap-2 text-xs font-medium text-fg-muted">
+        <Link to="/investors" className="hover:text-fg transition-colors">
+          Investors
+        </Link>
+        <ChevronRight className="size-3 text-fg-muted/60" />
+        <span className="text-fg truncate max-w-[240px] sm:max-w-md">{name}</span>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+        <div className="lg:col-span-2 flex flex-col gap-6">
+          <Card className="flex items-start justify-between gap-5">
           <div className="flex items-start gap-5">
             <Avatar src={investor.user?.avatarUrl} name={name} size="xl" />
             <div>
@@ -120,15 +130,16 @@ export default function InvestorProfilePage() {
           </p>
         )}
       </div>
-
-      <InvestorProfileEditModal open={editOpen} onClose={() => setEditOpen(false)} investor={investor} />
-      <IntroRequestModal
-        open={introOpen}
-        onClose={() => setIntroOpen(false)}
-        recipientId={investor.userId}
-        recipientName={name}
-        direction="FOUNDER_TO_INVESTOR"
-      />
     </div>
-  )
+
+    <InvestorProfileEditModal open={editOpen} onClose={() => setEditOpen(false)} investor={investor} />
+    <IntroRequestModal
+      open={introOpen}
+      onClose={() => setIntroOpen(false)}
+      recipientId={investor.userId}
+      recipientName={name}
+      direction="FOUNDER_TO_INVESTOR"
+    />
+  </div>
+)
 }

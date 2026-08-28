@@ -56,6 +56,7 @@ export default function OnboardingPage() {
       toast.success('Profile set up — welcome to Nukkad!')
       navigate('/')
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not save profile setup'),
   })
 
   function toggle<T>(list: T[], setList: (v: T[]) => void, value: T) {

@@ -20,7 +20,7 @@ function SectionHeading({ title, to }: { title: string; to: string }) {
   return (
     <div className="flex items-center justify-between mb-3">
       <h2 className="text-base font-semibold text-fg">{title}</h2>
-      <Link to={to} className="flex items-center gap-1 text-sm font-medium text-brand-600 hover:text-brand-700">
+      <Link to={to} className="flex items-center gap-1 text-sm font-semibold text-fg hover:underline">
         View all <ArrowRight className="size-3.5" />
       </Link>
     </div>
