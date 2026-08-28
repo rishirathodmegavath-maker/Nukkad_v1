@@ -51,6 +51,7 @@ export default function PostIdeaPage() {
       toast.success('Your idea is live!')
       navigate(`/ideas/${idea.id}`)
     },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not post idea'),
   })
 
   function toggleArea(area: ContributionArea) {

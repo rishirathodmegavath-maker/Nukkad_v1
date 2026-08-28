@@ -68,7 +68,7 @@ export default function OpportunityApplicationsPage() {
         title={opp.title}
         description={`${opp.applicantCount ?? 0} application${(opp.applicantCount ?? 0) === 1 ? '' : 's'}`}
         action={
-          <Link to={`/opportunities/${opp.id}`} className="text-sm font-medium text-brand-600 hover:underline">
+          <Link to={`/opportunities/${opp.id}`} className="text-sm font-semibold text-fg hover:underline">
             View opportunity
           </Link>
         }
