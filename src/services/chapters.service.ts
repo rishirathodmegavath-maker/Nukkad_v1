@@ -1,4 +1,4 @@
-import { apiClient, getPage } from '@/lib/api-client'
+import { apiClient, getPage, uploadFile } from '@/lib/api-client'
 import type { Chapter } from '@/types'
 
 interface ChapterDto {
@@ -75,4 +75,12 @@ export async function leaveChapter(id: string): Promise<Chapter> {
   const chapter = await getChapter(id)
   if (!chapter) throw new Error('Chapter not found')
   return chapter
+}
+
+export async function uploadChapterCover(id: string, file: File): Promise<Chapter> {
+  return mapChapter(await uploadFile<ChapterDto>(`/chapters/${id}/cover`, file))
+}
+
+export async function removeChapterCover(id: string): Promise<Chapter> {
+  return mapChapter(await apiClient.delete<ChapterDto>(`/chapters/${id}/cover`))
 }

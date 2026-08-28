@@ -11,7 +11,7 @@ export function ChapterCard({ chapter }: { chapter: Chapter }) {
           {chapter.coverImageUrl ? (
             <img src={chapter.coverImageUrl} alt="" className="size-full object-cover" />
           ) : (
-            <div className="size-full bg-surface-sunken" />
+            <div className="size-full bg-gradient-to-br from-brand-500/10 via-surface-sunken to-accent-500/10" />
           )}
         </div>
         <div className="p-4 sm:p-5 flex-1 flex flex-col justify-between">

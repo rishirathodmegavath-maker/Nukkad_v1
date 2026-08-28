@@ -1,8 +1,8 @@
-import { useState } from 'react'
+import { useRef, useState, type ChangeEvent } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Users, Crown, Plus, ChevronRight, CheckCircle2 } from 'lucide-react'
-import { getChapter, joinChapter } from '@/services/chapters.service'
+import { Users, Crown, Plus, ChevronRight, CheckCircle2, Camera, Trash2 } from 'lucide-react'
+import { getChapter, joinChapter, uploadChapterCover, removeChapterCover } from '@/services/chapters.service'
 import { listUsers } from '@/services/users.service'
 import { listIdeas } from '@/services/ideas.service'
 import { listStartups } from '@/services/startups.service'
@@ -17,6 +17,10 @@ import { Avatar } from '@/components/ui/Avatar'
 import { Tabs } from '@/components/ui/Tabs'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState, EmptyState } from '@/components/ui/EmptyState'
+import { DropdownMenu, DropdownItem } from '@/components/ui/DropdownMenu'
+import { ImageCropModal } from '@/components/ui/ImageCropModal'
+import { UploadSpinnerOverlay, type UploadPhase } from '@/components/ui/UploadButton'
+import { Modal } from '@/components/ui/Modal'
 import { PersonCard } from '@/components/domain/PersonCard'
 import { IdeaCard } from '@/components/domain/IdeaCard'
 import { StartupCard } from '@/components/domain/StartupCard'
@@ -41,6 +45,7 @@ export default function ChapterDetailPage() {
   const { data: president } = useUser(chapter?.presidentUserId)
   const { data: currentUser } = useCurrentUser()
   const canManageEvents = !!currentUser && currentUser.id === chapter?.presidentUserId
+  const isPresident = canManageEvents
 
   const joinMutation = useMutation({
     mutationFn: () => joinChapter(id!),
@@ -49,6 +54,40 @@ export default function ChapterDetailPage() {
       toast.success(`Joined ${chapter?.name}`)
     },
   })
+
+  const coverInputRef = useRef<HTMLInputElement>(null)
+  const [pendingCoverFile, setPendingCoverFile] = useState<File | null>(null)
+  const [coverPhase, setCoverPhase] = useState<UploadPhase>('idle')
+  const [showRemoveCoverModal, setShowRemoveCoverModal] = useState(false)
+
+  const uploadCoverMutation = useMutation({
+    mutationFn: (file: File) => uploadChapterCover(id!, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chapter', id] })
+      setCoverPhase('done')
+      setTimeout(() => setCoverPhase('idle'), 1200)
+      toast.success('Cover photo updated')
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Upload failed')
+      setCoverPhase('idle')
+    },
+  })
+
+  const removeCoverMutation = useMutation({
+    mutationFn: () => removeChapterCover(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chapter', id] })
+      toast.success('Cover photo removed')
+      setShowRemoveCoverModal(false)
+    },
+  })
+
+  function handleCoverChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (file) setPendingCoverFile(file)
+    e.target.value = ''
+  }
 
   const membersQuery = useQuery({
     queryKey: ['users', 'chapter', id],
@@ -108,11 +147,55 @@ export default function ChapterDetailPage() {
       </div>
 
       <Card padding="none" className="overflow-hidden rounded-2xl border border-border/80 shadow-xs bg-surface">
-        <div className="h-44 sm:h-56 w-full bg-surface-sunken overflow-hidden">
+        <div className="relative h-44 sm:h-56 w-full bg-surface-sunken overflow-hidden group">
           {chapter.coverImageUrl ? (
             <img src={chapter.coverImageUrl} alt={chapter.name} className="size-full object-cover" />
+          ) : isPresident ? (
+            <button
+              onClick={() => coverInputRef.current?.click()}
+              className="flex items-center justify-center gap-2 size-full text-xs font-semibold text-fg-muted hover:text-fg hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors"
+            >
+              <Camera className="size-4" /> Add a cover photo
+            </button>
           ) : (
-            <div className="size-full bg-surface-sunken" />
+            <div className="size-full bg-gradient-to-br from-brand-500/10 via-surface-sunken to-accent-500/10" />
+          )}
+
+          <UploadSpinnerOverlay phase={isPresident ? coverPhase : 'idle'} />
+
+          {isPresident && (
+            <div className="absolute top-3 right-3 sm:top-4 sm:right-4 z-10">
+              {chapter.coverImageUrl ? (
+                <DropdownMenu
+                  align="right"
+                  trigger={
+                    <button
+                      className="flex items-center gap-1.5 rounded-full bg-surface/90 text-fg hover:bg-surface text-xs font-semibold px-3 py-2 cursor-pointer backdrop-blur-md transition-all shadow-md border border-border/80"
+                      aria-label="Cover photo options"
+                    >
+                      <Camera className="size-3.5 text-fg-muted" />
+                      <span className="hidden sm:inline">Edit cover</span>
+                    </button>
+                  }
+                >
+                  <DropdownItem icon={<Camera className="size-4" />} onClick={() => coverInputRef.current?.click()}>
+                    Change cover photo
+                  </DropdownItem>
+                  <DropdownItem danger icon={<Trash2 className="size-4" />} onClick={() => setShowRemoveCoverModal(true)}>
+                    Delete cover photo
+                  </DropdownItem>
+                </DropdownMenu>
+              ) : (
+                <button
+                  onClick={() => coverInputRef.current?.click()}
+                  className="flex items-center gap-1.5 rounded-full bg-surface/90 text-fg hover:bg-surface text-xs font-semibold px-3 py-2 cursor-pointer backdrop-blur-md transition-all shadow-md border border-border/80"
+                  aria-label="Add cover photo"
+                >
+                  <Camera className="size-3.5 text-fg-muted" />
+                  <span className="hidden sm:inline">Add cover</span>
+                </button>
+              )}
+            </div>
           )}
         </div>
         <div className="p-6 sm:p-7 flex flex-wrap items-start justify-between gap-4">
@@ -270,6 +353,43 @@ export default function ChapterDetailPage() {
             description="Templates, guides, and slide decks shared by members will appear here."
           />
         ))}
+
+      <input
+        ref={coverInputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/webp,image/gif"
+        className="hidden"
+        onChange={handleCoverChange}
+      />
+      <ImageCropModal
+        file={pendingCoverFile}
+        aspect={16 / 6}
+        title="Crop cover photo"
+        onCancel={() => setPendingCoverFile(null)}
+        onConfirm={(cropped) => {
+          setPendingCoverFile(null)
+          setCoverPhase('uploading')
+          uploadCoverMutation.mutate(cropped)
+        }}
+      />
+      <Modal
+        open={showRemoveCoverModal}
+        onClose={() => setShowRemoveCoverModal(false)}
+        title="Delete cover photo?"
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowRemoveCoverModal(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" isLoading={removeCoverMutation.isPending} onClick={() => removeCoverMutation.mutate()}>
+              Delete
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-fg-secondary">This will remove {chapter.name}'s cover photo. You can add a new one anytime.</p>
+      </Modal>
     </div>
   )
 }
