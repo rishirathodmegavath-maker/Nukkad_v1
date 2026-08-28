@@ -30,17 +30,17 @@ export function LivePreviewPanel() {
       </div>
 
       <div className="flex bg-canvas">
-        <div className="w-32 shrink-0 bg-nav border-r border-border p-2 flex flex-col gap-1">
+        <div className="w-20 shrink-0 bg-nav border-r border-border p-1.5 flex flex-col gap-1">
           {NAV_ITEMS.map(({ key, label, icon: Icon, active }) => (
             <span
               key={key}
               className={cn(
-                'flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs font-medium',
+                'flex items-center gap-1.5 rounded-lg px-1.5 py-1.5 text-[11px] font-medium truncate',
                 active ? 'bg-nav-active text-nav-fg-active' : 'text-nav-fg',
               )}
             >
-              <Icon className="size-3.5" />
-              {label}
+              <Icon className="size-3.5 shrink-0" />
+              <span className="truncate">{label}</span>
             </span>
           ))}
         </div>
@@ -60,7 +60,7 @@ export function LivePreviewPanel() {
               <Badge tone="danger">Rejected</Badge>
               <Badge tone="info">Info</Badge>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2">
               <Button size="sm" variant="primary">
                 Primary
               </Button>
