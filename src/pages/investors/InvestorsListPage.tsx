@@ -138,6 +138,19 @@ export default function InvestorsListPage() {
 
       {tab === 'investors' && (
         <>
+          {myInvestorProfile && (
+            <Link to={`/investors/${myInvestorProfile.id}`}>
+              <Card interactive className="flex items-center justify-between gap-3 mb-6 border-brand-200 dark:border-brand-900 bg-brand-50/40 dark:bg-brand-950/20">
+                <div>
+                  <p className="text-xs font-bold text-brand-600 uppercase tracking-wide mb-0.5">Your investor profile</p>
+                  <p className="text-sm font-semibold text-fg">{myInvestorProfile.firmName || 'View your profile'}</p>
+                </div>
+                <Button size="sm" variant="secondary">
+                  View profile
+                </Button>
+              </Card>
+            </Link>
+          )}
           <SearchFilterBar query={query} onQueryChange={setQuery} placeholder="Search investors by name, firm or thesis…" />
           {investorsQuery.isLoading ? (
             <CardSkeletonGrid count={6} />

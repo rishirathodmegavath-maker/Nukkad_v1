@@ -1,8 +1,14 @@
 import { useRef, useState, type ChangeEvent } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Users, Crown, Plus, ChevronRight, CheckCircle2, Camera, Trash2 } from 'lucide-react'
-import { getChapter, joinChapter, uploadChapterCover, removeChapterCover } from '@/services/chapters.service'
+import { Users, Crown, Plus, ChevronRight, CheckCircle2, Camera, Trash2, Pencil, UserPlus, X } from 'lucide-react'
+import {
+  getChapter,
+  joinChapter,
+  uploadChapterCover,
+  removeChapterCover,
+  removeChapterMember,
+} from '@/services/chapters.service'
 import { listUsers } from '@/services/users.service'
 import { listIdeas } from '@/services/ideas.service'
 import { listStartups } from '@/services/startups.service'
@@ -22,6 +28,8 @@ import { ImageCropModal } from '@/components/ui/ImageCropModal'
 import { UploadSpinnerOverlay, type UploadPhase } from '@/components/ui/UploadButton'
 import { Modal } from '@/components/ui/Modal'
 import { PersonCard } from '@/components/domain/PersonCard'
+import { ChapterEditModal } from '@/components/domain/ChapterEditModal'
+import { AddChapterMemberModal } from '@/components/domain/AddChapterMemberModal'
 import { IdeaCard } from '@/components/domain/IdeaCard'
 import { StartupCard } from '@/components/domain/StartupCard'
 import { OpportunityCard } from '@/components/domain/OpportunityCard'
@@ -53,6 +61,19 @@ export default function ChapterDetailPage() {
       queryClient.invalidateQueries({ queryKey: ['chapter', id] })
       toast.success(`Joined ${chapter?.name}`)
     },
+  })
+
+  const [editOpen, setEditOpen] = useState(false)
+  const [addMemberOpen, setAddMemberOpen] = useState(false)
+
+  const removeMemberMutation = useMutation({
+    mutationFn: (userId: string) => removeChapterMember(id!, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['users', 'chapter', id] })
+      queryClient.invalidateQueries({ queryKey: ['chapter', id] })
+      toast.success('Removed from chapter')
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not remove member'),
   })
 
   const coverInputRef = useRef<HTMLInputElement>(null)
@@ -216,6 +237,11 @@ export default function ChapterDetailPage() {
             </div>
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
+            {isPresident && (
+              <Button variant="secondary" size="sm" leftIcon={<Pencil className="size-3.5" />} onClick={() => setEditOpen(true)}>
+                Edit chapter
+              </Button>
+            )}
             {isMember ? (
               <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-xs font-bold shadow-2xs">
                 <CheckCircle2 className="size-4" /> Member
@@ -242,19 +268,45 @@ export default function ChapterDetailPage() {
         ]}
       />
 
-      {tab === 'members' &&
-        (membersQuery.data && membersQuery.data.length > 0 ? (
-          <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
-            {membersQuery.data.map((u) => (
-              <PersonCard key={u.id} user={u} />
-            ))}
-          </div>
-        ) : (
-          <EmptyState
-            title="No members joined this chapter yet"
-            description="Be among the first founders and builders to represent this local hub."
-          />
-        ))}
+      {tab === 'members' && (
+        <div className="flex flex-col gap-4">
+          {isPresident && (
+            <div className="flex justify-end">
+              <Button size="sm" variant="secondary" leftIcon={<UserPlus className="size-3.5" />} onClick={() => setAddMemberOpen(true)}>
+                Add member
+              </Button>
+            </div>
+          )}
+          {membersQuery.data && membersQuery.data.length > 0 ? (
+            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-4">
+              {membersQuery.data.map((u) => (
+                <PersonCard
+                  key={u.id}
+                  user={u}
+                  topRightAction={
+                    isPresident && u.id !== chapter.presidentUserId ? (
+                      <button
+                        type="button"
+                        disabled={removeMemberMutation.isPending && removeMemberMutation.variables === u.id}
+                        onClick={() => removeMemberMutation.mutate(u.id)}
+                        title="Remove from chapter"
+                        className="shrink-0 rounded-full p-1.5 bg-surface/90 backdrop-blur-md border border-border/80 text-fg-muted hover:bg-danger-50 hover:text-danger-600 disabled:opacity-50 cursor-pointer shadow-2xs"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    ) : undefined
+                  }
+                />
+              ))}
+            </div>
+          ) : (
+            <EmptyState
+              title="No members joined this chapter yet"
+              description="Be among the first founders and builders to represent this local hub."
+            />
+          )}
+        </div>
+      )}
 
       {tab === 'ideas' &&
         (ideasQuery.data && ideasQuery.data.length > 0 ? (
@@ -390,6 +442,14 @@ export default function ChapterDetailPage() {
       >
         <p className="text-sm text-fg-secondary">This will remove {chapter.name}'s cover photo. You can add a new one anytime.</p>
       </Modal>
+      <ChapterEditModal open={editOpen} onClose={() => setEditOpen(false)} chapter={chapter} />
+      <AddChapterMemberModal
+        chapterId={chapter.id}
+        chapterName={chapter.name}
+        existingMemberIds={(membersQuery.data ?? []).map((u) => u.id)}
+        open={addMemberOpen}
+        onClose={() => setAddMemberOpen(false)}
+      />
     </div>
   )
 }

@@ -3,6 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Lightbulb, Plus } from 'lucide-react'
 import { listIdeas } from '@/services/ideas.service'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { IdeaCard } from '@/components/domain/IdeaCard'
 import { PageHeader } from '@/components/domain/PageHeader'
 import { SearchFilterBar } from '@/components/domain/SearchFilterBar'
@@ -24,13 +25,23 @@ export default function IdeasListPage() {
   const [searchParams] = useSearchParams()
   const [query, setQuery] = useState(searchParams.get('q') ?? '')
   const [stage, setStage] = useState('all')
+  const [mineOnly, setMineOnly] = useState(false)
+  const { data: currentUser } = useCurrentUser()
 
   const filters = useMemo(
-    () => ({ query: query || undefined, stage: stage === 'all' ? undefined : (stage as IdeaStage) }),
-    [query, stage],
+    () => ({
+      query: query || undefined,
+      stage: stage === 'all' ? undefined : (stage as IdeaStage),
+      creatorId: mineOnly ? currentUser?.id : undefined,
+    }),
+    [query, stage, mineOnly, currentUser?.id],
   )
 
-  const { data: ideas, isLoading } = useQuery({ queryKey: ['ideas', filters], queryFn: () => listIdeas(filters) })
+  const { data: ideas, isLoading } = useQuery({
+    queryKey: ['ideas', filters],
+    queryFn: () => listIdeas(filters),
+    enabled: !mineOnly || !!currentUser,
+  })
 
   return (
     <div>
@@ -45,6 +56,14 @@ export default function IdeasListPage() {
       />
       <SearchFilterBar query={query} onQueryChange={setQuery} placeholder="Search ideas by title or problem…">
         <PillTabs items={STAGE_FILTERS} value={stage} onChange={setStage} />
+        <PillTabs
+          items={[
+            { key: 'all', label: 'All ideas' },
+            { key: 'mine', label: 'My ideas' },
+          ]}
+          value={mineOnly ? 'mine' : 'all'}
+          onChange={(k) => setMineOnly(k === 'mine')}
+        />
       </SearchFilterBar>
 
       {isLoading ? (
@@ -55,6 +74,17 @@ export default function IdeasListPage() {
             <IdeaCard key={idea.id} idea={idea} />
           ))}
         </div>
+      ) : mineOnly ? (
+        <EmptyState
+          icon={<Lightbulb className="size-5" />}
+          title="You haven't posted any ideas yet"
+          description="Post an idea to find a team and see it here."
+          action={
+            <Link to="/ideas/new">
+              <Button size="sm">Post an idea</Button>
+            </Link>
+          }
+        />
       ) : (
         <EmptyState
           icon={<Lightbulb className="size-5" />}

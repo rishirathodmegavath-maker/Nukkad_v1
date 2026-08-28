@@ -6,6 +6,7 @@ export interface EventFilters {
   chapterId?: string
   upcoming?: boolean
   query?: string
+  organizerUserId?: string
 }
 
 export interface EventInput {
@@ -69,6 +70,7 @@ export async function listEvents(filters: EventFilters = {}): Promise<NukkadEven
     chapterId: filters.chapterId,
     upcoming: filters.upcoming,
     q: filters.query,
+    organizerUserId: filters.organizerUserId,
   })
   return dtos.map(mapEvent)
 }

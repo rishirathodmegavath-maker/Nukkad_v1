@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { MapPin, UserPlus, UserCheck, Clock, X } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
@@ -10,7 +11,17 @@ import { MatchReasons } from '@/components/domain/MatchReasons'
 import * as usersService from '@/services/users.service'
 import { toast } from '@/store/toast.store'
 
-export function PersonCard({ user, reasons, compatibilityScore }: { user: User; reasons?: string[]; compatibilityScore?: number }) {
+export function PersonCard({
+  user,
+  reasons,
+  compatibilityScore,
+  topRightAction,
+}: {
+  user: User
+  reasons?: string[]
+  compatibilityScore?: number
+  topRightAction?: ReactNode
+}) {
   const queryClient = useQueryClient()
   const connectMutation = useMutation({
     mutationFn: () => usersService.toggleConnect(user.id),
@@ -33,7 +44,12 @@ export function PersonCard({ user, reasons, compatibilityScore }: { user: User; 
   })
 
   return (
-    <Card interactive className="flex flex-col gap-3 rounded-xl border border-border/80 shadow-xs hover:border-border-strong transition-all min-w-0 overflow-hidden bg-surface">
+    <Card interactive className="relative flex flex-col gap-3 rounded-xl border border-border/80 shadow-xs hover:border-border-strong transition-all min-w-0 overflow-hidden bg-surface">
+      {topRightAction && (
+        <div className="absolute top-2.5 right-2.5 z-10" onClick={(e) => e.stopPropagation()}>
+          {topRightAction}
+        </div>
+      )}
       <Link to={`/people/${user.id}`} className="flex items-start gap-3">
         <Avatar src={user.avatarUrl} name={user.name} size="lg" />
         <div className="min-w-0 flex-1">

@@ -1,5 +1,6 @@
 import { apiClient, getPage, uploadFile } from '@/lib/api-client'
-import type { Chapter } from '@/types'
+import { mapUser, type UserDto } from '@/services/users.service'
+import type { Chapter, User } from '@/types'
 
 interface ChapterDto {
   id: string
@@ -38,8 +39,14 @@ function mapChapter(dto: ChapterDto): Chapter {
   }
 }
 
-export async function listChapters(query?: string): Promise<Chapter[]> {
-  const dtos = await getPage<ChapterDto>('/chapters', { q: query })
+export interface ChapterFilters {
+  query?: string
+  presidentUserId?: string
+}
+
+export async function listChapters(filters: ChapterFilters | string = {}): Promise<Chapter[]> {
+  const { query, presidentUserId } = typeof filters === 'string' ? { query: filters, presidentUserId: undefined } : filters
+  const dtos = await getPage<ChapterDto>('/chapters', { q: query, presidentUserId })
   return dtos.map(mapChapter)
 }
 
@@ -61,6 +68,25 @@ export interface CreateChapterInput {
 
 export async function createChapter(input: CreateChapterInput): Promise<Chapter> {
   return mapChapter(await apiClient.post<ChapterDto>('/chapters', input))
+}
+
+export interface UpdateChapterInput {
+  name?: string
+  city?: string
+  country?: string
+  description?: string
+}
+
+export async function updateChapter(id: string, input: UpdateChapterInput): Promise<Chapter> {
+  return mapChapter(await apiClient.put<ChapterDto>(`/chapters/${id}`, input))
+}
+
+export async function addChapterMember(chapterId: string, userId: string): Promise<User> {
+  return mapUser(await apiClient.post<UserDto>(`/chapters/${chapterId}/members/${userId}`))
+}
+
+export async function removeChapterMember(chapterId: string, userId: string): Promise<User> {
+  return mapUser(await apiClient.delete<UserDto>(`/chapters/${chapterId}/members/${userId}`))
 }
 
 export async function joinChapter(id: string): Promise<Chapter> {

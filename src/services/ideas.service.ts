@@ -86,6 +86,22 @@ export async function postIdea(payload: PostIdeaPayload): Promise<Idea> {
   return mapIdea(dto)
 }
 
+export interface UpdateIdeaPayload {
+  title?: string
+  problem?: string
+  solution?: string
+  targetCustomer?: string
+  stage?: IdeaStage
+  category?: string
+  tags?: string[]
+  helpNeeded?: ContributionArea[]
+}
+
+export async function updateIdea(id: string, payload: UpdateIdeaPayload): Promise<Idea> {
+  const dto = await apiClient.put<IdeaDto>(`/ideas/${id}`, payload)
+  return mapIdea(dto)
+}
+
 interface IdeaInterestDto {
   id: string
   ideaId: string

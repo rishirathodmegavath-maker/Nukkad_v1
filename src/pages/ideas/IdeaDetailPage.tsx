@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Users, Sparkles, ArrowRight, Check, X, Star, ChevronRight, MessageSquare } from 'lucide-react'
+import { Users, Sparkles, ArrowRight, Check, X, Star, ChevronRight, MessageSquare, Pencil } from 'lucide-react'
 import { getOrCreateConversationWith } from '@/services/messages.service'
 import {
   getIdea,
@@ -23,6 +23,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/EmptyState'
 import { ExpressInterestModal } from '@/components/domain/ExpressInterestModal'
+import { IdeaEditModal } from '@/components/domain/IdeaEditModal'
 import { MatchReasons } from '@/components/domain/MatchReasons'
 import { formatRelativeTime } from '@/lib/utils'
 import { toast } from '@/store/toast.store'
@@ -82,6 +83,7 @@ export default function IdeaDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
+  const [editOpen, setEditOpen] = useState(false)
   const { data: currentUser } = useCurrentUser()
 
   const { data: idea, isLoading, isError, refetch } = useQuery({
@@ -206,6 +208,11 @@ export default function IdeaDetailPage() {
               <Badge tone={stageTone[idea.stage]}>{idea.stage}</Badge>
               <Badge tone="neutral">{idea.category}</Badge>
               <span className="text-xs text-fg-muted ml-auto">{formatRelativeTime(idea.createdAt)}</span>
+              {isCreator && (
+                <Button variant="secondary" size="sm" leftIcon={<Pencil className="size-3.5" />} onClick={() => setEditOpen(true)}>
+                  Edit
+                </Button>
+              )}
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-fg tracking-tight leading-tight mb-4">{idea.title}</h1>
 
@@ -450,6 +457,7 @@ export default function IdeaDetailPage() {
       open={modalOpen}
       onClose={() => setModalOpen(false)}
     />
+    <IdeaEditModal open={editOpen} onClose={() => setEditOpen(false)} idea={idea} />
   </div>
 )
 }

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { CalendarDays, Plus } from 'lucide-react'
 import { listEvents } from '@/services/events.service'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { EventCard } from '@/components/domain/EventCard'
 import { PageHeader } from '@/components/domain/PageHeader'
 import { PillTabs } from '@/components/ui/Tabs'
@@ -13,9 +14,13 @@ import { EmptyState } from '@/components/ui/EmptyState'
 export default function EventsListPage() {
   const navigate = useNavigate()
   const [upcomingOnly, setUpcomingOnly] = useState(true)
+  const [mineOnly, setMineOnly] = useState(false)
+  const { data: currentUser } = useCurrentUser()
+
   const { data: events, isLoading } = useQuery({
-    queryKey: ['events', upcomingOnly],
-    queryFn: () => listEvents({ upcoming: upcomingOnly }),
+    queryKey: ['events', upcomingOnly, mineOnly, currentUser?.id],
+    queryFn: () => listEvents({ upcoming: upcomingOnly, organizerUserId: mineOnly ? currentUser?.id : undefined }),
+    enabled: !mineOnly || !!currentUser,
   })
 
   return (
@@ -29,7 +34,7 @@ export default function EventsListPage() {
           </Button>
         }
       />
-      <div className="mb-6">
+      <div className="mb-6 flex flex-wrap items-center gap-4">
         <PillTabs
           items={[
             { key: 'upcoming', label: 'Upcoming' },
@@ -37,6 +42,14 @@ export default function EventsListPage() {
           ]}
           value={upcomingOnly ? 'upcoming' : 'all'}
           onChange={(k) => setUpcomingOnly(k === 'upcoming')}
+        />
+        <PillTabs
+          items={[
+            { key: 'all', label: 'All organizers' },
+            { key: 'mine', label: 'Hosted by me' },
+          ]}
+          value={mineOnly ? 'mine' : 'all'}
+          onChange={(k) => setMineOnly(k === 'mine')}
         />
       </div>
 
@@ -48,6 +61,17 @@ export default function EventsListPage() {
             <EventCard key={event.id} event={event} />
           ))}
         </div>
+      ) : mineOnly ? (
+        <EmptyState
+          icon={<CalendarDays className="size-5" />}
+          title="You haven't hosted any events yet"
+          description="Events you organize will show up here."
+          action={
+            <Button size="sm" leftIcon={<Plus className="size-3.5" />} onClick={() => navigate('/events/new')}>
+              Host an Event
+            </Button>
+          }
+        />
       ) : (
         <EmptyState
           icon={<CalendarDays className="size-5" />}
