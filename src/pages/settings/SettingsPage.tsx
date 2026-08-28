@@ -22,6 +22,7 @@ import { clearSession } from '@/lib/session'
 import { cn } from '@/lib/utils'
 import { useThemeStore, type ThemePreference } from '@/store/theme.store'
 import { PresetGrid } from '@/components/settings/appearance/PresetGrid'
+import { ColorPickerPanel } from '@/components/settings/appearance/ColorPickerPanel'
 import type { AccountPrivacySettings, ConnectPermission, MessagePermission, ProfileVisibility } from '@/types'
 import { PageHeader } from '@/components/domain/PageHeader'
 import { Card } from '@/components/ui/Card'
@@ -466,6 +467,12 @@ function AppearanceSection() {
         <h2 className="font-semibold text-fg mb-1">Theme colour</h2>
         <p className="text-sm text-fg-muted mb-4">Pick a professionally designed accent colour for buttons, links, and active states.</p>
         <PresetGrid />
+      </Card>
+
+      <Card>
+        <h2 className="font-semibold text-fg mb-1">Custom colour</h2>
+        <p className="text-sm text-fg-muted mb-4">Or choose your own — Nukkad generates a complete, accessible palette from it automatically.</p>
+        <ColorPickerPanel />
       </Card>
     </div>
   )

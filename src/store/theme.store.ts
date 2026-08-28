@@ -24,6 +24,8 @@ const EMPTY_OVERRIDES: AdvancedOverrides = {
   secondarySurfaceColor: null,
 }
 
+let customColorPersistTimer: ReturnType<typeof setTimeout> | undefined
+
 const THEME_KEY = 'nukkad.theme'
 const CACHE_KEY = 'nukkad.appearance.cache'
 const RECENT_COLORS_KEY = 'nukkad.recentColors'
@@ -117,6 +119,7 @@ interface ThemeState {
   hydrated: boolean
   setThemePreference: (preference: ThemePreference) => void
   setPreset: (preset: ThemePresetId) => void
+  setCustomColor: (hex: string) => void
   hydrateFromServer: (settings: AppearanceSettings) => void
   addRecentColor: (hex: string) => void
   clearRecentColors: () => void
@@ -159,6 +162,20 @@ export const useThemeStore = create<ThemeState>((set, get) => ({
     updateAppearanceSettings({ themePreset: preset }).catch(() => {
       // Not fatal — localStorage still holds the preference for this device.
     })
+  },
+
+  setCustomColor: (hex) => {
+    const { theme, overrides } = get()
+    applyEffectiveTheme(theme, 'CUSTOM', hex, overrides)
+    cacheAppearance({ preset: 'CUSTOM', customPrimaryColor: hex, overrides })
+    set({ preset: 'CUSTOM', customPrimaryColor: hex })
+
+    if (customColorPersistTimer) clearTimeout(customColorPersistTimer)
+    customColorPersistTimer = setTimeout(() => {
+      updateAppearanceSettings({ themePreset: 'CUSTOM', customPrimaryColor: hex }).catch(() => {
+        // Not fatal — localStorage still holds the preference for this device.
+      })
+    }, 400)
   },
 
   hydrateFromServer: (settings) => {
