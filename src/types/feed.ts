@@ -1,0 +1,34 @@
+export type PostType = 'text' | 'startup_update' | 'idea' | 'opportunity' | 'event'
+
+export type AttachmentKind = 'image' | 'video' | 'pdf'
+
+export interface PostAttachment {
+  id: string
+  url: string
+  kind: AttachmentKind
+  fileName?: string
+}
+
+export interface Post {
+  id: string
+  authorId: string
+  type: PostType
+  content: string
+  relatedId?: string
+  likesCount: number
+  commentsCount: number
+  isLiked?: boolean
+  isSaved?: boolean
+  hideLikeCount?: boolean
+  commentsDisabled?: boolean
+  createdAt: string
+  attachments: PostAttachment[]
+}
+
+export interface PostComment {
+  id: string
+  postId: string
+  authorId: string
+  content: string
+  createdAt: string
+}

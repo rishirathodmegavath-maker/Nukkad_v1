@@ -1,0 +1,66 @@
+import type { Experience, User, UserProject } from './user'
+
+export type OpportunityType =
+  | 'Full-time'
+  | 'Internship'
+  | 'Founding Role'
+  | 'Co-founder'
+  | 'Startup Project'
+  | 'AI/ML Role'
+  | 'Campus'
+
+export type ApplicationStatus = 'Pending' | 'Shortlisted' | 'Accepted' | 'Rejected' | 'Withdrawn'
+
+export interface Opportunity {
+  id: string
+  title: string
+  type: OpportunityType
+  startupId?: string
+  organizationName: string
+  location: string
+  remote: boolean
+  description: string
+  requirements: string[]
+  compensation?: string
+  postedByUserId: string
+  /** Embedded (mock era). The real backend exposes viewer-relative state/counts instead. */
+  applicantIds?: string[]
+  interestedIds?: string[]
+  hasApplied?: boolean
+  hasExpressedInterest?: boolean
+  /** The viewer's own application status for this opportunity, if they've applied. */
+  applicationStatus?: ApplicationStatus
+  applicantCount?: number
+  interestCount?: number
+  chapterId?: string
+  createdAt: string
+}
+
+export interface ApplyToOpportunityInput {
+  whyInterested: string
+  whyGoodFit: string
+  relevantSkills?: string[]
+  experienceIds?: string[]
+  projectIds?: string[]
+  availability?: string
+  expectedCommitment?: string
+  additionalMessage?: string
+}
+
+export interface Application {
+  id: string
+  opportunityId: string
+  opportunityTitle: string
+  applicant: User
+  status: ApplicationStatus
+  whyInterested: string
+  whyGoodFit: string
+  relevantSkills: string[]
+  relevantExperience: Experience[]
+  relevantProjects: UserProject[]
+  availability?: string
+  expectedCommitment?: string
+  additionalMessage?: string
+  createdAt: string
+  reviewedAt?: string
+}
