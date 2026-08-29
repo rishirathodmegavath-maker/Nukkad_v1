@@ -1,7 +1,8 @@
 import { useRef, useState, type ChangeEvent, type FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Camera, UserX, Monitor, LogOut as LogOutIcon } from 'lucide-react'
+import { Camera, UserX, Monitor, LogOut as LogOutIcon, ShieldCheck } from 'lucide-react'
+import { GoogleSignInButton } from '@/components/domain/GoogleSignInButton'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import {
   updateCurrentUser,
@@ -211,6 +212,36 @@ function ChangePasswordSection() {
           Change password
         </Button>
       </form>
+    </Card>
+  )
+}
+
+function ConnectGoogleSection({ user }: { user: User }) {
+  const queryClient = useQueryClient()
+
+  function handleLinked() {
+    queryClient.invalidateQueries({ queryKey: ['currentUser'] })
+    toast.success('Google account connected.')
+  }
+
+  function handleError(err: Error) {
+    toast.error(err.message || 'Could not connect Google account')
+  }
+
+  return (
+    <Card>
+      <h2 className="font-semibold text-fg mb-1">Google account</h2>
+      <p className="text-sm text-fg-muted mb-3">
+        Connect Google to use "Continue with Google" the next time you log in.
+      </p>
+      {user.googleLinked ? (
+        <div className="flex items-center gap-2 text-sm font-medium text-success-500">
+          <ShieldCheck className="size-4" />
+          Google connected
+        </div>
+      ) : (
+        <GoogleSignInButton mode="link" onSuccess={handleLinked} onError={handleError} />
+      )}
     </Card>
   )
 }
@@ -628,6 +659,7 @@ export default function SettingsPage() {
         <div className="flex flex-col gap-6">
           <SessionsSection />
           <ChangePasswordSection />
+          {user && <ConnectGoogleSection user={user} />}
         </div>
       )}
 

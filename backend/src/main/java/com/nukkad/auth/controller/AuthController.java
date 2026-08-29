@@ -3,6 +3,7 @@ package com.nukkad.auth.controller;
 import com.nukkad.auth.dto.AuthResponse;
 import com.nukkad.auth.dto.ChangePasswordRequest;
 import com.nukkad.auth.dto.GoogleAuthRequest;
+import com.nukkad.auth.dto.LinkGoogleRequest;
 import com.nukkad.auth.dto.LoginRequest;
 import com.nukkad.auth.dto.MessageResponse;
 import com.nukkad.auth.dto.PasswordResetConfirmDto;
@@ -10,6 +11,9 @@ import com.nukkad.auth.dto.PasswordResetRequestDto;
 import com.nukkad.auth.dto.RefreshRequest;
 import com.nukkad.auth.dto.RefreshTokenResponse;
 import com.nukkad.auth.dto.RegisterRequest;
+import com.nukkad.auth.dto.RegisterResponse;
+import com.nukkad.auth.dto.ResendVerificationRequest;
+import com.nukkad.auth.dto.VerifyEmailRequest;
 import com.nukkad.auth.service.AuthService;
 import com.nukkad.common.response.ApiResponse;
 import com.nukkad.security.AuthenticatedUser;
@@ -47,8 +51,20 @@ public class AuthController {
 
     @PostMapping("/register")
     @ResponseStatus(HttpStatus.CREATED)
-    public ApiResponse<AuthResponse> register(@Valid @RequestBody RegisterRequest request, HttpServletRequest httpRequest) {
+    public ApiResponse<RegisterResponse> register(@Valid @RequestBody RegisterRequest request, HttpServletRequest httpRequest) {
         return ApiResponse.ok(authService.register(request, httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent")));
+    }
+
+    @PostMapping("/verify-email")
+    public ApiResponse<MessageResponse> verifyEmail(@Valid @RequestBody VerifyEmailRequest request) {
+        authService.verifyEmail(request.token());
+        return ApiResponse.ok(new MessageResponse("Email verified. You can now log in."));
+    }
+
+    @PostMapping("/resend-verification")
+    public ApiResponse<MessageResponse> resendVerification(@Valid @RequestBody ResendVerificationRequest request) {
+        authService.resendVerificationEmail(request.email());
+        return ApiResponse.ok(new MessageResponse("If that email exists and isn't verified yet, a new verification link was sent."));
     }
 
     @PostMapping("/login")
@@ -59,6 +75,14 @@ public class AuthController {
     @PostMapping("/google")
     public ApiResponse<AuthResponse> google(@Valid @RequestBody GoogleAuthRequest request, HttpServletRequest httpRequest) {
         return ApiResponse.ok(authService.loginWithGoogle(request.idToken(), httpRequest.getRemoteAddr(), httpRequest.getHeader("User-Agent")));
+    }
+
+    @PostMapping("/google/link")
+    @SecurityRequirement(name = "bearerAuth")
+    public ApiResponse<MessageResponse> linkGoogle(@AuthenticationPrincipal AuthenticatedUser principal,
+                                                     @Valid @RequestBody LinkGoogleRequest request) {
+        authService.linkGoogleAccount(principal.id(), request.idToken());
+        return ApiResponse.ok(new MessageResponse("Google account connected."));
     }
 
     @PostMapping("/refresh")

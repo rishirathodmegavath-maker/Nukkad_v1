@@ -148,6 +148,7 @@ export interface UserDto {
   endorsementSummary: EndorsementSummary[]
   recommendations: RecommendationDto[]
   roles: string[]
+  googleLinked: boolean
 }
 
 export function mapExperience(dto: ExperienceDto): Experience {
@@ -285,6 +286,7 @@ export function mapUser(dto: UserDto): User {
     isOnline: dto.isOnline,
     createdAt: dto.createdAt,
     roles: dto.roles ?? [],
+    googleLinked: dto.googleLinked,
   }
 }
 

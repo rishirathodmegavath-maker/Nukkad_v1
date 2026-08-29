@@ -1,10 +1,20 @@
 import { useEffect, useRef } from 'react'
 import { useAuthStore } from '@/store/auth.store'
+import { linkGoogleAccount } from '@/services/auth.service'
+import { ApiError } from '@/lib/api-client'
 import { toast } from '@/store/toast.store'
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
 
-export function GoogleSignInButton({ onSuccess }: { onSuccess: (isNewUser: boolean) => void }) {
+interface GoogleSignInButtonProps {
+  /** 'login' authenticates an existing linked account. 'link' attaches Google to the currently
+   *  logged-in account from Settings — it never signs the user in or out. */
+  mode?: 'login' | 'link'
+  onSuccess: () => void
+  onError?: (error: ApiError | Error) => void
+}
+
+export function GoogleSignInButton({ mode = 'login', onSuccess, onError }: GoogleSignInButtonProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const loginWithGoogle = useAuthStore((s) => s.loginWithGoogle)
 
@@ -18,10 +28,18 @@ export function GoogleSignInButton({ onSuccess }: { onSuccess: (isNewUser: boole
         client_id: CLIENT_ID,
         callback: async (response) => {
           try {
-            const { isNewUser } = await loginWithGoogle(response.credential)
-            onSuccess(isNewUser)
+            if (mode === 'link') {
+              await linkGoogleAccount(response.credential)
+            } else {
+              await loginWithGoogle(response.credential)
+            }
+            onSuccess()
           } catch (err) {
-            toast.error(err instanceof Error ? err.message : 'Google sign-in failed')
+            if (onError && err instanceof Error) {
+              onError(err)
+            } else {
+              toast.error(err instanceof Error ? err.message : 'Google sign-in failed')
+            }
           }
         },
       })
@@ -47,17 +65,19 @@ export function GoogleSignInButton({ onSuccess }: { onSuccess: (isNewUser: boole
         clearInterval(interval)
       }
     }
-  }, [loginWithGoogle, onSuccess])
+  }, [loginWithGoogle, onSuccess, onError, mode])
 
   if (!CLIENT_ID) return null
 
   return (
     <div className="flex flex-col items-center gap-3 w-full">
-      <div className="flex items-center gap-3 w-full">
-        <div className="h-px flex-1 bg-border-subtle" />
-        <span className="text-xs text-fg-muted">or</span>
-        <div className="h-px flex-1 bg-border-subtle" />
-      </div>
+      {mode === 'login' && (
+        <div className="flex items-center gap-3 w-full">
+          <div className="h-px flex-1 bg-border-subtle" />
+          <span className="text-xs text-fg-muted">or</span>
+          <div className="h-px flex-1 bg-border-subtle" />
+        </div>
+      )}
       <div ref={containerRef} />
     </div>
   )

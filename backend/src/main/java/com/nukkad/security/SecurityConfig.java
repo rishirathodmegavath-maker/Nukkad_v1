@@ -28,6 +28,8 @@ public class SecurityConfig {
             "/api/auth/login",
             "/api/auth/google",
             "/api/auth/refresh",
+            "/api/auth/verify-email",
+            "/api/auth/resend-verification",
             "/api/auth/password-reset/**",
             "/swagger-ui/**",
             "/swagger-ui.html",
@@ -40,15 +42,18 @@ public class SecurityConfig {
     private final CorsProperties corsProperties;
     private final RestAuthenticationEntryPoint authenticationEntryPoint;
     private final RestAccessDeniedHandler accessDeniedHandler;
+    private final RateLimiter rateLimiter;
 
     public SecurityConfig(JwtService jwtService,
                            CorsProperties corsProperties,
                            RestAuthenticationEntryPoint authenticationEntryPoint,
-                           RestAccessDeniedHandler accessDeniedHandler) {
+                           RestAccessDeniedHandler accessDeniedHandler,
+                           RateLimiter rateLimiter) {
         this.jwtService = jwtService;
         this.corsProperties = corsProperties;
         this.authenticationEntryPoint = authenticationEntryPoint;
         this.accessDeniedHandler = accessDeniedHandler;
+        this.rateLimiter = rateLimiter;
     }
 
     @Bean
@@ -68,7 +73,8 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(PUBLIC_PATHS).permitAll()
                         .anyRequest().authenticated())
-                .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class);
+                .addFilterBefore(new JwtAuthenticationFilter(jwtService), UsernamePasswordAuthenticationFilter.class)
+                .addFilterBefore(new AuthRateLimitFilter(rateLimiter), JwtAuthenticationFilter.class);
         return http.build();
     }
 

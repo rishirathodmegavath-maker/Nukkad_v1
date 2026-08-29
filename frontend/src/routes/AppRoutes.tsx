@@ -5,6 +5,7 @@ import { AppShell } from '@/components/layout/AppShell'
 import LoginPage from '@/pages/auth/LoginPage'
 import SignupPage from '@/pages/auth/SignupPage'
 import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage'
+import VerifyEmailPage from '@/pages/auth/VerifyEmailPage'
 import OnboardingPage from '@/pages/onboarding/OnboardingPage'
 
 import HomePage from '@/pages/home/HomePage'
@@ -46,6 +47,7 @@ export function AppRoutes() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
       </Route>
 
       <Route element={<ProtectedRoute />}>

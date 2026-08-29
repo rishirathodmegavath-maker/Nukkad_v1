@@ -9,8 +9,8 @@ interface AuthState {
   isAuthenticated: boolean
   init: () => void
   login: (credentials: LoginCredentials) => Promise<void>
-  signup: (payload: SignupPayload) => Promise<void>
-  loginWithGoogle: (idToken: string) => Promise<{ isNewUser: boolean }>
+  signup: (payload: SignupPayload) => Promise<{ email: string; message: string }>
+  loginWithGoogle: (idToken: string) => Promise<void>
   logout: () => Promise<void>
 }
 
@@ -27,16 +27,12 @@ export const useAuthStore = create<AuthState>((set) => ({
     queryClient.clear()
     set({ session, isAuthenticated: true })
   },
-  signup: async (payload) => {
-    const session = await authService.signup(payload)
-    queryClient.clear()
-    set({ session, isAuthenticated: true })
-  },
+  // Register no longer issues a session — the account must be email-verified before login.
+  signup: async (payload) => authService.signup(payload),
   loginWithGoogle: async (idToken) => {
-    const { session, isNewUser } = await authService.loginWithGoogle(idToken)
+    const session = await authService.loginWithGoogle(idToken)
     queryClient.clear()
     set({ session, isAuthenticated: true })
-    return { isNewUser }
   },
   logout: async () => {
     await authService.logout()
