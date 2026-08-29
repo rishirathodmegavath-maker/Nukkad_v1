@@ -1,4 +1,4 @@
-import { NavLink } from 'react-router-dom'
+import { NavLink, Link } from 'react-router-dom'
 import { X, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { navSections } from './nav-config'
 import { useUiStore } from '@/store/ui.store'
@@ -83,14 +83,14 @@ export function DesktopSidebar() {
           collapsed ? 'justify-center px-2' : 'justify-between px-5',
         )}
       >
-        <div className="flex items-center gap-2.5 min-w-0">
+        <Link to="/" className="flex items-center gap-2.5 min-w-0 rounded-lg transition-opacity hover:opacity-80" aria-label="Go to home">
           <Logo size="sm" />
           {!collapsed && (
             <span className="flex items-center gap-1.5 min-w-0">
               <span className="text-lg font-bold text-fg tracking-tight truncate">Nukkad</span>
             </span>
           )}
-        </div>
+        </Link>
         {!collapsed && (
           <button
             onClick={toggleSidebar}
@@ -140,10 +140,15 @@ export function MobileDrawer() {
       <div className="absolute inset-0 bg-overlay/60 backdrop-blur-xs animate-in" onClick={() => setOpen(false)} />
       <div className="relative flex flex-col w-[280px] max-w-[85vw] h-full bg-surface border-r border-border shadow-2xl animate-in">
         <div className="flex items-center justify-between px-5 h-16 shrink-0 border-b border-border/60">
-          <div className="flex items-center gap-2.5">
+          <Link
+            to="/"
+            onClick={() => setOpen(false)}
+            className="flex items-center gap-2.5 rounded-lg transition-opacity hover:opacity-80"
+            aria-label="Go to home"
+          >
             <Logo size="sm" />
             <span className="text-lg font-bold text-fg tracking-tight">Nukkad</span>
-          </div>
+          </Link>
           <button
             onClick={() => setOpen(false)}
             aria-label="Close menu"
