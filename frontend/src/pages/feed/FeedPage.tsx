@@ -1,17 +1,18 @@
 import { useRef, useState, useMemo, type ChangeEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Send, Image, FileText, X, Video, Bookmark, Sparkles } from 'lucide-react'
+import { Send, Image, FileText, X, Video, Bookmark, Sparkles, Plus } from 'lucide-react'
 import { listFeed, createPost, uploadAttachment } from '@/services/feed.service'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { PostCard } from '@/components/domain/PostCard'
-import { Card } from '@/components/ui/Card'
 import { Avatar } from '@/components/ui/Avatar'
-import { PillTabs } from '@/components/ui/Tabs'
+import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
 import { UploadButton, UploadSpinnerOverlay, type UploadPhase } from '@/components/ui/UploadButton'
 import { CardSkeletonGrid } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { toast } from '@/store/toast.store'
+import { cn } from '@/lib/utils'
 import type { Post } from '@/types'
 
 const MAX_ATTACHMENTS = 10
@@ -27,11 +28,6 @@ function pickKind(file: File): 'image' | 'video' | 'pdf' | null {
   if (file.type === 'application/pdf') return 'pdf'
   return null
 }
-
-const FEED_TABS = [
-  { key: 'all', label: 'All Feed' },
-  { key: 'saved', label: 'Saved Posts' },
-]
 
 function SavedPostsGrid({ posts }: { posts: Post[] }) {
   const postIds = posts.map((p) => p.id)
@@ -79,11 +75,15 @@ export default function FeedPage() {
   const tab = searchParams.get('tab') === 'saved' ? 'saved' : 'all'
   const setTab = (next: string) => setSearchParams(next === 'saved' ? { tab: 'saved' } : {})
   const [content, setContent] = useState('')
-  const [isFocused, setIsFocused] = useState(false)
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
   const [postPhase, setPostPhase] = useState<UploadPhase>('idle')
   const mediaInputRef = useRef<HTMLInputElement>(null)
   const docInputRef = useRef<HTMLInputElement>(null)
+
+  function handleCreateClick() {
+    setIsCreateModalOpen(true)
+  }
 
   const { data: posts, isLoading, isError, refetch } = useQuery({
     queryKey: ['feed'],
@@ -108,9 +108,11 @@ export default function FeedPage() {
       pendingFiles.forEach((p) => p.previewUrl && URL.revokeObjectURL(p.previewUrl))
       setContent('')
       setPendingFiles([])
-      setIsFocused(false)
       setPostPhase('done')
-      setTimeout(() => setPostPhase('idle'), 1200)
+      setTimeout(() => {
+        setPostPhase('idle')
+        setIsCreateModalOpen(false)
+      }, 700)
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : 'Could not create post')
@@ -154,116 +156,144 @@ export default function FeedPage() {
 
   return (
     <div className="max-w-[620px] mx-auto flex flex-col gap-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-fg tracking-tight">Community Feed</h1>
-          <p className="text-sm text-fg-muted mt-0.5">Updates, questions, and wins from founders and builders.</p>
-        </div>
-        <PillTabs items={FEED_TABS} value={tab} onChange={setTab} />
+      <div className="flex items-center justify-between gap-2">
+        <Button
+          size="sm"
+          variant="primary"
+          leftIcon={<Plus className="size-4" />}
+          onClick={handleCreateClick}
+          className="text-xs shadow-xs"
+        >
+          Create
+        </Button>
+
+        <Button
+          size="sm"
+          variant={tab === 'saved' ? 'primary' : 'secondary'}
+          leftIcon={<Bookmark className={cn('size-3.5', tab === 'saved' && 'fill-current')} />}
+          onClick={() => setTab(tab === 'saved' ? 'all' : 'saved')}
+          className="text-xs"
+        >
+          {tab === 'saved' ? 'All Feed' : 'Saved posts'}
+        </Button>
       </div>
 
-      {tab === 'all' && (
-        <Card className="flex flex-col gap-3 shadow-sm border-border/80 p-4 sm:p-5">
-          <div className="flex gap-3">
+      {/* Create Post Modal */}
+      <Modal
+        open={isCreateModalOpen}
+        onClose={() => {
+          if (postPhase !== 'uploading') {
+            setIsCreateModalOpen(false)
+          }
+        }}
+        title="Create a post"
+        size="md"
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3">
             <Avatar src={currentUser?.avatarUrl} name={currentUser?.name ?? ''} size="md" />
-            <div className="flex-1 flex flex-col gap-2 min-w-0">
-              <textarea
-                value={content}
-                onChange={(e) => setContent(e.target.value)}
-                onFocus={() => setIsFocused(true)}
-                placeholder="Share an update, ask for feedback, or celebrate a milestone…"
-                rows={isFocused || content || pendingFiles.length > 0 ? 3 : 2}
-                className="w-full resize-none rounded-xl border border-border/80 bg-surface-sunken/40 px-3.5 py-2.5 text-sm text-fg outline-none focus:border-brand-500 focus:bg-surface focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-fg-muted leading-relaxed"
-              />
-
-              {pendingFiles.length > 0 && (
-                <div className="flex flex-wrap gap-2.5 pt-1">
-                  {pendingFiles.map((p, i) => {
-                    const kind = pickKind(p.file)
-                    return (
-                      <div
-                        key={i}
-                        className="relative size-18 rounded-xl overflow-hidden border border-border/80 bg-surface-sunken shrink-0 shadow-2xs group"
-                      >
-                        {p.previewUrl ? (
-                          <img src={p.previewUrl} alt="" className="size-full object-cover" />
-                        ) : (
-                          <div className="size-full flex flex-col items-center justify-center gap-1 p-1 text-center bg-surface-sunken">
-                            {kind === 'video' ? (
-                              <Video className="size-5 text-brand-600 dark:text-brand-400" />
-                            ) : (
-                              <FileText className="size-5 text-accent-500" />
-                            )}
-                            <span className="text-[10px] font-medium text-fg-muted truncate w-full px-1">
-                              {p.file.name}
-                            </span>
-                          </div>
-                        )}
-                        <UploadSpinnerOverlay phase={postPhase} />
-                        {postPhase === 'idle' && (
-                          <button
-                            type="button"
-                            onClick={() => removeFile(i)}
-                            className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-neutral-900/80 text-white hover:bg-neutral-900 cursor-pointer transition-colors shadow-xs"
-                            aria-label="Remove attachment"
-                          >
-                            <X className="size-3" />
-                          </button>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              <div className="flex items-center justify-between pt-1 mt-1 border-t border-border/60">
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => mediaInputRef.current?.click()}
-                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
-                  >
-                    <Image className="size-4 text-brand-600 dark:text-brand-400" /> Photo/Video
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => docInputRef.current?.click()}
-                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
-                  >
-                    <FileText className="size-4 text-accent-500" /> Document (PDF)
-                  </button>
-                  <input
-                    ref={mediaInputRef}
-                    type="file"
-                    accept="image/*,video/*"
-                    multiple
-                    hidden
-                    onChange={addFiles}
-                  />
-                  <input
-                    ref={docInputRef}
-                    type="file"
-                    accept="application/pdf"
-                    multiple
-                    hidden
-                    onChange={addFiles}
-                  />
-                </div>
-                <UploadButton
-                  size="sm"
-                  phase={postPhase}
-                  idleLabel="Post"
-                  leftIcon={postPhase === 'idle' ? <Send className="size-3.5" /> : undefined}
-                  uploadingLabel={pendingFiles.length > 0 ? 'Uploading…' : 'Posting…'}
-                  doneLabel="Posted"
-                  disabled={!canPost}
-                  onClick={handlePost}
-                />
-              </div>
+            <div>
+              <p className="text-sm font-bold text-fg">{currentUser?.name || 'You'}</p>
+              <p className="text-xs text-fg-muted">Posting to Community Feed</p>
             </div>
           </div>
-        </Card>
-      )}
+
+          <textarea
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
+            placeholder="Share an update, ask for feedback, or celebrate a milestone…"
+            rows={4}
+            className="w-full resize-none rounded-xl border border-border/80 bg-surface-sunken/40 px-3.5 py-2.5 text-sm text-fg outline-none focus:border-brand-500 focus:bg-surface focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-fg-muted leading-relaxed"
+            autoFocus
+          />
+
+          {pendingFiles.length > 0 && (
+            <div className="flex flex-wrap gap-2.5 pt-1">
+              {pendingFiles.map((p, i) => {
+                const kind = pickKind(p.file)
+                return (
+                  <div
+                    key={i}
+                    className="relative size-18 rounded-xl overflow-hidden border border-border/80 bg-surface-sunken shrink-0 shadow-2xs group"
+                  >
+                    {p.previewUrl ? (
+                      <img src={p.previewUrl} alt="" className="size-full object-cover" />
+                    ) : (
+                      <div className="size-full flex flex-col items-center justify-center gap-1 p-1 text-center bg-surface-sunken">
+                        {kind === 'video' ? (
+                          <Video className="size-5 text-brand-600 dark:text-brand-400" />
+                        ) : (
+                          <FileText className="size-5 text-accent-500" />
+                        )}
+                        <span className="text-[10px] font-medium text-fg-muted truncate w-full px-1">
+                          {p.file.name}
+                        </span>
+                      </div>
+                    )}
+                    <UploadSpinnerOverlay phase={postPhase} />
+                    {postPhase === 'idle' && (
+                      <button
+                        type="button"
+                        onClick={() => removeFile(i)}
+                        className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-neutral-900/80 text-white hover:bg-neutral-900 cursor-pointer transition-colors shadow-xs"
+                        aria-label="Remove attachment"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          <div className="flex items-center justify-between pt-3 border-t border-border/60">
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => mediaInputRef.current?.click()}
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors border border-border/60"
+              >
+                <Image className="size-4 text-brand-600 dark:text-brand-400" /> Photo/Video
+              </button>
+              <button
+                type="button"
+                onClick={() => docInputRef.current?.click()}
+                className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors border border-border/60"
+              >
+                <FileText className="size-4 text-accent-500" /> Document (PDF)
+              </button>
+              <input
+                ref={mediaInputRef}
+                type="file"
+                accept="image/*,video/*"
+                multiple
+                hidden
+                onChange={addFiles}
+              />
+              <input
+                ref={docInputRef}
+                type="file"
+                accept="application/pdf"
+                multiple
+                hidden
+                onChange={addFiles}
+              />
+            </div>
+
+            <UploadButton
+              size="sm"
+              phase={postPhase}
+              idleLabel="Post"
+              leftIcon={postPhase === 'idle' ? <Send className="size-3.5" /> : undefined}
+              uploadingLabel={pendingFiles.length > 0 ? 'Uploading…' : 'Posting…'}
+              doneLabel="Posted"
+              disabled={!canPost}
+              onClick={handlePost}
+            />
+          </div>
+        </div>
+      </Modal>
 
       {isLoading ? (
         <CardSkeletonGrid count={3} />

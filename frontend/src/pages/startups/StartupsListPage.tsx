@@ -1,15 +1,19 @@
 import { useMemo, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Rocket } from 'lucide-react'
 import { listStartups } from '@/services/startups.service'
 import { StartupCard } from '@/components/domain/StartupCard'
-import type { StartupStage } from '@/types'
+import type { Startup, StartupStage } from '@/types'
 import { PageHeader } from '@/components/domain/PageHeader'
 import { SearchFilterBar } from '@/components/domain/SearchFilterBar'
 import { PillTabs } from '@/components/ui/Tabs'
+import { Button } from '@/components/ui/Button'
+import { Modal } from '@/components/ui/Modal'
 import { CardSkeletonGrid } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { toast } from '@/store/toast.store'
 import { cn } from '@/lib/utils'
 
 const STAGE_FILTERS = [
@@ -22,10 +26,16 @@ const STAGE_FILTERS = [
 ]
 
 export default function StartupsListPage() {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const { data: currentUser } = useCurrentUser()
   const [searchParams] = useSearchParams()
   const [query, setQuery] = useState(searchParams.get('q') ?? '')
   const [stage, setStage] = useState('all')
   const [raisingOnly, setRaisingOnly] = useState(false)
+  const [isCheckingExistingStartup, setIsCheckingExistingStartup] = useState(false)
+  const [existingStartupOpen, setExistingStartupOpen] = useState(false)
+  const [myStartups, setMyStartups] = useState<Startup[]>([])
 
   const filters = useMemo(
     () => ({
@@ -38,11 +48,42 @@ export default function StartupsListPage() {
 
   const { data: startups, isLoading } = useQuery({ queryKey: ['startups', filters], queryFn: () => listStartups(filters) })
 
+  async function handleExistingStartupClick() {
+    if (!currentUser) return
+    setIsCheckingExistingStartup(true)
+    try {
+      const mine = await queryClient.fetchQuery({
+        queryKey: ['startups', 'member', currentUser.id],
+        queryFn: () => listStartups({ memberId: currentUser.id }),
+      })
+      if (mine.length === 1) {
+        navigate(`/startups/${mine[0].id}`)
+      } else {
+        setMyStartups(mine)
+        setExistingStartupOpen(true)
+      }
+    } catch {
+      toast.error('Could not load your startups. Please try again.')
+    } finally {
+      setIsCheckingExistingStartup(false)
+    }
+  }
+
   return (
     <div>
       <PageHeader
         title="Startups"
         description="See what’s being built across the Nukkad network."
+        action={
+          <Button
+            variant="secondary"
+            leftIcon={<Rocket className="size-4" />}
+            isLoading={isCheckingExistingStartup}
+            onClick={handleExistingStartupClick}
+          >
+            Existing Startup
+          </Button>
+        }
       />
       <SearchFilterBar query={query} onQueryChange={setQuery} placeholder="Search startups by name or sector…">
         <div className="flex flex-wrap items-center gap-3">
@@ -73,6 +114,33 @@ export default function StartupsListPage() {
       ) : (
         <EmptyState icon={<Rocket className="size-5" />} title="No startups match yet" description="Try a different search or clear your filters." />
       )}
+
+      <Modal
+        open={existingStartupOpen}
+        onClose={() => setExistingStartupOpen(false)}
+        title="Your startups"
+        description="Pick a startup to view or manage."
+        size="md"
+      >
+        {myStartups.length > 0 ? (
+          <div className="flex flex-col gap-3">
+            {myStartups.map((startup) => (
+              <StartupCard key={startup.id} startup={startup} />
+            ))}
+          </div>
+        ) : (
+          <EmptyState
+            icon={<Rocket className="size-5" />}
+            title="No startup yet"
+            description="Your startup will appear here after you turn an idea into a startup."
+            action={
+              <Link to="/ideas/new">
+                <Button size="sm">Post an idea</Button>
+              </Link>
+            }
+          />
+        )}
+      </Modal>
     </div>
   )
 }

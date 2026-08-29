@@ -32,7 +32,6 @@ import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { CardSkeletonGrid } from '@/components/ui/Skeleton'
-import { ErrorState } from '@/components/ui/EmptyState'
 import { formatRelativeTime } from '@/lib/utils'
 import type { OpportunityMatch } from '@/types'
 
@@ -345,7 +344,83 @@ export default function HomePage() {
           </section>
 
           {/* ------------------------------------------------------------ */}
-          {/* Section B: Opportunities & Roles (Compact & High Density)    */}
+          {/* Section B: Latest from Nukkad (Primary Community Feed)       */}
+          {/* ------------------------------------------------------------ */}
+          <section className="flex flex-col gap-4">
+            <div className="flex items-center justify-between pb-1 border-b border-border/60">
+              <div className="flex items-center gap-2">
+                <div className="flex items-center justify-center size-6 rounded-lg bg-brand-50 dark:bg-brand-950/50 text-brand-600 dark:text-brand-400 border border-brand-200/60 dark:border-brand-800/50">
+                  <Rss className="size-3.5" />
+                </div>
+                <h2 className="text-base font-bold text-fg">Latest from Nukkad</h2>
+              </div>
+              <Link
+                to="/feed"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-fg hover:underline group"
+              >
+                <span>View Feed</span>
+                <ArrowRight className="size-3.5 group-hover:translate-x-0.5 transition-transform" />
+              </Link>
+            </div>
+
+            {feedQuery.isLoading ? (
+              <div className="flex flex-col gap-4">
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="p-5 rounded-xl border border-border/80 bg-surface flex flex-col gap-3 shadow-xs"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="size-10 rounded-full bg-surface-sunken animate-pulse" />
+                      <div className="flex flex-col gap-1.5 flex-1">
+                        <div className="h-3.5 w-28 rounded bg-surface-sunken animate-pulse" />
+                        <div className="h-2.5 w-16 rounded bg-surface-sunken animate-pulse" />
+                      </div>
+                    </div>
+                    <div className="h-14 w-full rounded-lg bg-surface-sunken/60 animate-pulse" />
+                    <div className="h-8 w-full rounded-lg bg-surface-sunken/40 animate-pulse" />
+                  </div>
+                ))}
+              </div>
+            ) : feedQuery.isError ? (
+              <Card className="p-6 text-center border border-border/80 shadow-xs">
+                <p className="text-sm font-semibold text-fg">Couldn’t load the feed right now.</p>
+                <p className="text-xs text-fg-muted mt-1 mb-3">Please try again to see the latest community posts.</p>
+                <Button size="sm" variant="outline" onClick={() => feedQuery.refetch()}>
+                  Retry
+                </Button>
+              </Card>
+            ) : feedQuery.data && feedQuery.data.length > 0 ? (
+              <div className="flex flex-col gap-4">
+                {feedQuery.data.map((post) => (
+                  <PostCard key={post.id} post={post} />
+                ))}
+
+                <div className="pt-2 text-center">
+                  <Link to="/feed">
+                    <Button variant="secondary" size="sm" className="w-full sm:w-auto shadow-2xs">
+                      <span>Explore all community posts</span>
+                      <ArrowRight className="size-3.5 ml-1.5" />
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            ) : (
+              <Card className="p-6 text-center border border-border/80 shadow-xs">
+                <Sparkles className="size-8 text-fg-muted mx-auto mb-2" />
+                <p className="text-sm font-semibold text-fg">Nothing new yet</p>
+                <p className="text-xs text-fg-muted mt-1 max-w-sm mx-auto mb-3">
+                  Be the first to share something with the community.
+                </p>
+                <Link to="/feed">
+                  <Button size="sm">Go to Feed</Button>
+                </Link>
+              </Card>
+            )}
+          </section>
+
+          {/* ------------------------------------------------------------ */}
+          {/* Section C: Opportunities & Roles (Compact & High Density)    */}
           {/* ------------------------------------------------------------ */}
           <section className="flex flex-col gap-3.5">
             <div className="flex items-center justify-between pb-1 border-b border-border/60">
@@ -395,7 +470,31 @@ export default function HomePage() {
         {/* ============================================================== */}
         <div className="lg:col-span-4 flex flex-col gap-6 min-w-0">
           {/* ------------------------------------------------------------ */}
-          {/* Section C: Upcoming Events & Meetups                         */}
+          {/* Section D: People You Should Know (Network Pulse)            */}
+          {/* ------------------------------------------------------------ */}
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between pb-1 border-b border-border/60">
+              <h2 className="text-sm font-bold text-fg flex items-center gap-1.5">
+                <Users className="size-4 text-fg-muted" />
+                <span>People you may know</span>
+              </h2>
+              <Link
+                to="/people"
+                className="text-xs font-semibold text-fg hover:underline"
+              >
+                Explore
+              </Link>
+            </div>
+
+            <Card padding="none" className="overflow-hidden border border-border/80 shadow-2xs">
+              <div className="p-3">
+                <SuggestedForYou limit={4} />
+              </div>
+            </Card>
+          </section>
+
+          {/* ------------------------------------------------------------ */}
+          {/* Section E: Upcoming Events & Meetups                         */}
           {/* ------------------------------------------------------------ */}
           <section className="flex flex-col gap-3">
             <div className="flex items-center justify-between pb-1 border-b border-border/60">
@@ -433,68 +532,7 @@ export default function HomePage() {
           </section>
 
           {/* ------------------------------------------------------------ */}
-          {/* Section C.5: Latest from the Feed                            */}
-          {/* ------------------------------------------------------------ */}
-          <section className="flex flex-col gap-3">
-            <div className="flex items-center justify-between pb-1 border-b border-border/60">
-              <h2 className="text-sm font-bold text-fg flex items-center gap-1.5">
-                <Rss className="size-4 text-fg-muted" />
-                <span>Latest from the Feed</span>
-              </h2>
-              <Link to="/feed" className="text-xs font-semibold text-fg hover:underline">
-                View Feed
-              </Link>
-            </div>
-
-            {feedQuery.isLoading ? (
-              <div className="flex flex-col gap-3">
-                <div className="h-40 w-full rounded-xl bg-surface-sunken/60 animate-pulse border border-border/70" />
-                <div className="h-40 w-full rounded-xl bg-surface-sunken/60 animate-pulse border border-border/70" />
-              </div>
-            ) : feedQuery.isError ? (
-              <ErrorState description="Couldn’t load the feed right now." onRetry={() => feedQuery.refetch()} />
-            ) : feedQuery.data && feedQuery.data.length > 0 ? (
-              <div className="flex flex-col gap-4">
-                {feedQuery.data.map((post) => (
-                  <PostCard key={post.id} post={post} />
-                ))}
-              </div>
-            ) : (
-              <Card className="p-4 text-center">
-                <p className="text-xs font-semibold text-fg">Nothing new yet</p>
-                <p className="text-[11px] text-fg-muted mt-0.5">
-                  Be the first to share something with the community.
-                </p>
-              </Card>
-            )}
-          </section>
-
-          {/* ------------------------------------------------------------ */}
-          {/* Section D: People You Should Know (Network Pulse)            */}
-          {/* ------------------------------------------------------------ */}
-          <section className="flex flex-col gap-3">
-            <div className="flex items-center justify-between pb-1 border-b border-border/60">
-              <h2 className="text-sm font-bold text-fg flex items-center gap-1.5">
-                <Users className="size-4 text-fg-muted" />
-                <span>People you may know</span>
-              </h2>
-              <Link
-                to="/people"
-                className="text-xs font-semibold text-fg hover:underline"
-              >
-                Explore
-              </Link>
-            </div>
-
-            <Card padding="none" className="overflow-hidden border border-border/80 shadow-2xs">
-              <div className="p-3">
-                <SuggestedForYou limit={4} />
-              </div>
-            </Card>
-          </section>
-
-          {/* ------------------------------------------------------------ */}
-          {/* Section E: Local Chapter Hub Summary                         */}
+          {/* Section F: Local Chapter Hub Summary                         */}
           {/* ------------------------------------------------------------ */}
           <section className="flex flex-col gap-3">
             <div className="flex items-center justify-between pb-1 border-b border-border/60">
