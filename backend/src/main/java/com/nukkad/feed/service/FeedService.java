@@ -214,10 +214,10 @@ public class FeedService {
         return toCommentDto(comment);
     }
 
-    public AttachmentRef uploadAttachment(MultipartFile file, String publicBaseUrl) {
+    public AttachmentRef uploadAttachment(MultipartFile file) {
         var stored = fileStorageService.storeMedia(file, "feed");
         String originalName = file.getOriginalFilename();
-        return new AttachmentRef(publicBaseUrl + "/uploads/" + stored.path(), stored.kind().name(), originalName);
+        return new AttachmentRef(stored.url(), stored.kind().name(), originalName);
     }
 
     private Post.Type parseType(String type) {

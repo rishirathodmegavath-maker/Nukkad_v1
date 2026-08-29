@@ -56,8 +56,12 @@ nukkad:
     client-id: ${GOOGLE_CLIENT_ID:}
   messaging:
     encryption-key: ${MESSAGE_ENCRYPTION_KEY}
-  uploads:
-    dir: ${UPLOADS_DIR:uploads}
+  storage:
+    bucket: ${S3_BUCKET:nukkad-uploads}
+    region: ${S3_REGION:us-east-1}
+    endpoint-override: ${S3_ENDPOINT_OVERRIDE:http://localhost:9000}
+    force-path-style: ${S3_FORCE_PATH_STYLE:true}
+    public-base-url: ${S3_PUBLIC_BASE_URL:http://localhost:9000/nukkad-uploads}
 
 logging:
   level:

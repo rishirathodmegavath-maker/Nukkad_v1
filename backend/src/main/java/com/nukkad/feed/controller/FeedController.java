@@ -11,7 +11,6 @@ import com.nukkad.feed.dto.UpdatePostRequest;
 import com.nukkad.feed.service.FeedService;
 import com.nukkad.security.AuthenticatedUser;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
-import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -27,7 +26,6 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 @RestController
 @RequestMapping("/api/feed")
@@ -117,11 +115,7 @@ public class FeedController {
     }
 
     @PostMapping("/attachments")
-    public ApiResponse<AttachmentRef> uploadAttachment(@RequestParam("file") MultipartFile file, HttpServletRequest httpRequest) {
-        String baseUrl = ServletUriComponentsBuilder.fromRequestUri(httpRequest)
-                .replacePath(null)
-                .build()
-                .toUriString();
-        return ApiResponse.ok(feedService.uploadAttachment(file, baseUrl));
+    public ApiResponse<AttachmentRef> uploadAttachment(@RequestParam("file") MultipartFile file) {
+        return ApiResponse.ok(feedService.uploadAttachment(file));
     }
 }
