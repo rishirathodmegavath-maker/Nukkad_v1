@@ -27,6 +27,7 @@ export interface UserFilters {
   lookingFor?: LookingFor
   minExperience?: number
   chapterId?: string
+  size?: number
 }
 
 export interface ExperienceDto {
@@ -297,6 +298,7 @@ export async function listUsers(filters: UserFilters = {}): Promise<User[]> {
     lookingFor: filters.lookingFor,
     minExperience: filters.minExperience,
     chapterId: filters.chapterId,
+    size: filters.size,
   })
   return dtos.map(mapUser)
 }

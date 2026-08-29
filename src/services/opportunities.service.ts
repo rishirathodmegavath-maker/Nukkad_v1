@@ -15,6 +15,7 @@ export interface OpportunityFilters {
   type?: OpportunityType
   remote?: boolean
   chapterId?: string
+  size?: number
 }
 
 interface OpportunityDto {
@@ -68,6 +69,7 @@ export async function listOpportunities(filters: OpportunityFilters = {}): Promi
     type: filters.type,
     remote: filters.remote,
     chapterId: filters.chapterId,
+    size: filters.size,
   })
   return dtos.map(mapOpportunity)
 }

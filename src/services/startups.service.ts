@@ -18,6 +18,7 @@ export interface StartupFilters {
   isRaising?: boolean
   chapterId?: string
   memberId?: string
+  size?: number
 }
 
 interface StartupDto {
@@ -67,6 +68,7 @@ export async function listStartups(filters: StartupFilters = {}): Promise<Startu
     isRaising: filters.isRaising,
     chapterId: filters.chapterId,
     memberId: filters.memberId,
+    size: filters.size,
   })
   return dtos.map(mapStartup)
 }

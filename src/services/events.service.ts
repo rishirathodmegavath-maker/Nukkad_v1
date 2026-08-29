@@ -7,6 +7,7 @@ export interface EventFilters {
   upcoming?: boolean
   query?: string
   organizerUserId?: string
+  size?: number
 }
 
 export interface EventInput {
@@ -71,6 +72,7 @@ export async function listEvents(filters: EventFilters = {}): Promise<NukkadEven
     upcoming: filters.upcoming,
     q: filters.query,
     organizerUserId: filters.organizerUserId,
+    size: filters.size,
   })
   return dtos.map(mapEvent)
 }

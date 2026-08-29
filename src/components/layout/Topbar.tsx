@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Menu, Search, Bell, MessageSquare, Sun, Moon, User, Settings, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Menu, Search, X, Bell, MessageSquare, Sun, Moon, User, Settings, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
 import { useUiStore } from '@/store/ui.store'
 import { useThemeStore } from '@/store/theme.store'
 import { useAuthStore } from '@/store/auth.store'
@@ -9,7 +9,9 @@ import { useUnreadNotificationCount } from '@/hooks/useNotifications'
 import { useUnreadMessageCount } from '@/hooks/useConversations'
 import { Avatar } from '@/components/ui/Avatar'
 import { DropdownMenu, DropdownItem, DropdownDivider } from '@/components/ui/DropdownMenu'
+import { GlobalSearchBox } from '@/components/domain/GlobalSearchBox'
 import { toast } from '@/store/toast.store'
+import { cn } from '@/lib/utils'
 
 function NotificationDot({ count }: { count: number }) {
   if (!count) return null
@@ -32,12 +34,7 @@ export function Topbar() {
   const { data: currentUser } = useCurrentUser()
   const { data: unreadNotifs = 0 } = useUnreadNotificationCount()
   const unreadMessages = useUnreadMessageCount()
-  const [query, setQuery] = useState('')
-
-  function handleSearch(e: React.FormEvent) {
-    e.preventDefault()
-    if (query.trim()) navigate(`/search?q=${encodeURIComponent(query.trim())}`)
-  }
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false)
 
   async function handleLogout() {
     await logout()
@@ -51,7 +48,10 @@ export function Topbar() {
       <button
         onClick={() => setMobileNavOpen(true)}
         aria-label="Open mobile menu"
-        className="lg:hidden flex size-9 items-center justify-center rounded-xl text-fg-secondary hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
+        className={cn(
+          'lg:hidden flex size-9 items-center justify-center rounded-xl text-fg-secondary hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors',
+          mobileSearchOpen && 'hidden',
+        )}
       >
         <Menu className="size-5" />
       </button>
@@ -65,28 +65,30 @@ export function Topbar() {
         {sidebarCollapsed ? <PanelLeftOpen className="size-4.5" /> : <PanelLeftClose className="size-4.5" />}
       </button>
 
-      <form onSubmit={handleSearch} className="hidden sm:flex flex-1 max-w-md relative items-center">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 size-4 text-fg-muted pointer-events-none" />
-        <input
-          value={query}
-          onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search people, ideas, startups…"
-          className="w-full rounded-xl border border-border/80 bg-surface-sunken/60 pl-10 pr-10 py-2 text-sm text-fg outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-fg-muted shadow-2xs"
-        />
-        {query && (
+      <GlobalSearchBox variant="desktop" />
+
+      {mobileSearchOpen ? (
+        <>
+          <GlobalSearchBox variant="mobile" />
           <button
-            type="button"
-            onClick={() => setQuery('')}
-            className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-fg-muted hover:text-fg cursor-pointer"
+            onClick={() => setMobileSearchOpen(false)}
+            aria-label="Close search"
+            className="sm:hidden flex size-9 shrink-0 items-center justify-center rounded-xl text-fg-secondary hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
           >
-            Clear
+            <X className="size-5" />
           </button>
-        )}
-      </form>
+        </>
+      ) : (
+        <button
+          onClick={() => setMobileSearchOpen(true)}
+          aria-label="Open search"
+          className="sm:hidden flex size-9 items-center justify-center rounded-xl text-fg-secondary hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
+        >
+          <Search className="size-4.5" />
+        </button>
+      )}
 
-      <div className="flex-1 sm:hidden" />
-
-      <div className="flex items-center gap-2 ml-auto">
+      <div className={cn('items-center gap-2 ml-auto', mobileSearchOpen ? 'hidden sm:flex' : 'flex')}>
         <button
           onClick={toggleTheme}
           className="flex size-9 items-center justify-center rounded-xl text-fg-secondary hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"

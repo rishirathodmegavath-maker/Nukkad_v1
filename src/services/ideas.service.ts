@@ -9,6 +9,7 @@ export interface IdeaFilters {
   helpNeeded?: ContributionArea
   chapterId?: string
   creatorId?: string
+  size?: number
 }
 
 interface IdeaDto {
@@ -58,6 +59,7 @@ export async function listIdeas(filters: IdeaFilters = {}): Promise<Idea[]> {
     helpNeeded: filters.helpNeeded,
     chapterId: filters.chapterId,
     creatorId: filters.creatorId,
+    size: filters.size,
   })
   return dtos.map(mapIdea)
 }
