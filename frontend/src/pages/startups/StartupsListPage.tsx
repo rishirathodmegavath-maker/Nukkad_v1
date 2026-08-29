@@ -1,14 +1,13 @@
 import { useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Rocket, Plus } from 'lucide-react'
+import { Rocket } from 'lucide-react'
 import { listStartups } from '@/services/startups.service'
 import { StartupCard } from '@/components/domain/StartupCard'
 import type { StartupStage } from '@/types'
 import { PageHeader } from '@/components/domain/PageHeader'
 import { SearchFilterBar } from '@/components/domain/SearchFilterBar'
 import { PillTabs } from '@/components/ui/Tabs'
-import { Button } from '@/components/ui/Button'
 import { CardSkeletonGrid } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { cn } from '@/lib/utils'
@@ -44,11 +43,6 @@ export default function StartupsListPage() {
       <PageHeader
         title="Startups"
         description="See what’s being built across the Nukkad network."
-        action={
-          <Link to="/ideas/new">
-            <Button leftIcon={<Plus className="size-4" />}>Post an idea</Button>
-          </Link>
-        }
       />
       <SearchFilterBar query={query} onQueryChange={setQuery} placeholder="Search startups by name or sector…">
         <div className="flex flex-wrap items-center gap-3">

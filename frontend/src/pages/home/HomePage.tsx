@@ -13,6 +13,7 @@ import {
   Plus,
   Compass,
   ChevronRight,
+  Rss,
 } from 'lucide-react'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { listIdeas } from '@/services/ideas.service'
@@ -20,15 +21,18 @@ import { listStartups } from '@/services/startups.service'
 import { listOpportunities, listRecommendedOpportunities } from '@/services/opportunities.service'
 import { listEvents } from '@/services/events.service'
 import { getChapter } from '@/services/chapters.service'
+import { listFeed } from '@/services/feed.service'
 import { IdeaCard } from '@/components/domain/IdeaCard'
 import { StartupCard } from '@/components/domain/StartupCard'
 import { EventCard } from '@/components/domain/EventCard'
 import { SuggestedForYou } from '@/components/domain/SuggestedForYou'
 import { MatchReasons } from '@/components/domain/MatchReasons'
+import { PostCard } from '@/components/domain/PostCard'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { Button } from '@/components/ui/Button'
 import { CardSkeletonGrid } from '@/components/ui/Skeleton'
+import { ErrorState } from '@/components/ui/EmptyState'
 import { formatRelativeTime } from '@/lib/utils'
 import type { OpportunityMatch } from '@/types'
 
@@ -119,6 +123,7 @@ export default function HomePage() {
     enabled: !recommendedOppsQuery.data || recommendedOppsQuery.data.length === 0,
   })
   const eventsQuery = useQuery({ queryKey: ['events', 'upcoming'], queryFn: () => listEvents({ upcoming: true }) })
+  const feedQuery = useQuery({ queryKey: ['feed', 'home'], queryFn: () => listFeed(undefined, 4) })
   const chapterQuery = useQuery({
     queryKey: ['chapter', currentUser?.chapterId],
     queryFn: () => getChapter(currentUser!.chapterId!),
@@ -423,6 +428,43 @@ export default function HomePage() {
                     Host an event
                   </Button>
                 </Link>
+              </Card>
+            )}
+          </section>
+
+          {/* ------------------------------------------------------------ */}
+          {/* Section C.5: Latest from the Feed                            */}
+          {/* ------------------------------------------------------------ */}
+          <section className="flex flex-col gap-3">
+            <div className="flex items-center justify-between pb-1 border-b border-border/60">
+              <h2 className="text-sm font-bold text-fg flex items-center gap-1.5">
+                <Rss className="size-4 text-fg-muted" />
+                <span>Latest from the Feed</span>
+              </h2>
+              <Link to="/feed" className="text-xs font-semibold text-fg hover:underline">
+                View Feed
+              </Link>
+            </div>
+
+            {feedQuery.isLoading ? (
+              <div className="flex flex-col gap-3">
+                <div className="h-40 w-full rounded-xl bg-surface-sunken/60 animate-pulse border border-border/70" />
+                <div className="h-40 w-full rounded-xl bg-surface-sunken/60 animate-pulse border border-border/70" />
+              </div>
+            ) : feedQuery.isError ? (
+              <ErrorState description="Couldn’t load the feed right now." onRetry={() => feedQuery.refetch()} />
+            ) : feedQuery.data && feedQuery.data.length > 0 ? (
+              <div className="flex flex-col gap-4">
+                {feedQuery.data.map((post) => (
+                  <PostCard key={post.id} post={post} />
+                ))}
+              </div>
+            ) : (
+              <Card className="p-4 text-center">
+                <p className="text-xs font-semibold text-fg">Nothing new yet</p>
+                <p className="text-[11px] text-fg-muted mt-0.5">
+                  Be the first to share something with the community.
+                </p>
               </Card>
             )}
           </section>
