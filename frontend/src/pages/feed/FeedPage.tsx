@@ -1,0 +1,309 @@
+import { useRef, useState, useMemo, type ChangeEvent } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Send, Image, FileText, X, Video, Bookmark, Sparkles } from 'lucide-react'
+import { listFeed, createPost, uploadAttachment } from '@/services/feed.service'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { PostCard } from '@/components/domain/PostCard'
+import { Card } from '@/components/ui/Card'
+import { Avatar } from '@/components/ui/Avatar'
+import { PillTabs } from '@/components/ui/Tabs'
+import { UploadButton, UploadSpinnerOverlay, type UploadPhase } from '@/components/ui/UploadButton'
+import { CardSkeletonGrid } from '@/components/ui/Skeleton'
+import { EmptyState } from '@/components/ui/EmptyState'
+import { toast } from '@/store/toast.store'
+import type { Post } from '@/types'
+
+const MAX_ATTACHMENTS = 10
+
+interface PendingFile {
+  file: File
+  previewUrl?: string
+}
+
+function pickKind(file: File): 'image' | 'video' | 'pdf' | null {
+  if (file.type.startsWith('image/')) return 'image'
+  if (file.type.startsWith('video/')) return 'video'
+  if (file.type === 'application/pdf') return 'pdf'
+  return null
+}
+
+const FEED_TABS = [
+  { key: 'all', label: 'All Feed' },
+  { key: 'saved', label: 'Saved Posts' },
+]
+
+function SavedPostsGrid({ posts }: { posts: Post[] }) {
+  const postIds = posts.map((p) => p.id)
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+      {posts.map((post) => {
+        const image = post.attachments.find((a) => a.kind === 'image')
+        return (
+          <Link
+            key={post.id}
+            to={`/feed/${post.id}`}
+            state={{ from: '/feed?tab=saved', fromLabel: 'Back to saved posts', postIds }}
+            className="group relative aspect-square overflow-hidden rounded-xl bg-surface-sunken border border-border/80 hover:border-brand-500 transition-all"
+          >
+            {image ? (
+              <img src={image.url} alt="" className="size-full object-cover transition-transform group-hover:scale-105" />
+            ) : (
+              <div className="flex size-full items-center justify-center p-3 text-center bg-surface">
+                <p className="text-xs text-fg-secondary line-clamp-5 leading-relaxed">{post.content}</p>
+              </div>
+            )}
+            {post.attachments.length > 1 && (
+              <span className="absolute top-2 right-2 rounded-full bg-black/60 backdrop-blur-xs text-white text-[10px] font-semibold px-2 py-0.5">
+                +{post.attachments.length - 1}
+              </span>
+            )}
+            <span className="absolute top-2 left-2 flex size-6 items-center justify-center rounded-full bg-black/60 backdrop-blur-xs text-amber-400">
+              <Bookmark className="size-3.5 fill-current" />
+            </span>
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent px-2.5 py-2 opacity-0 group-hover:opacity-100 transition-opacity">
+              <p className="text-[11px] font-semibold text-white truncate">{post.content || 'View post'}</p>
+            </div>
+          </Link>
+        )
+      })}
+    </div>
+  )
+}
+
+export default function FeedPage() {
+  const queryClient = useQueryClient()
+  const { data: currentUser } = useCurrentUser()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const tab = searchParams.get('tab') === 'saved' ? 'saved' : 'all'
+  const setTab = (next: string) => setSearchParams(next === 'saved' ? { tab: 'saved' } : {})
+  const [content, setContent] = useState('')
+  const [isFocused, setIsFocused] = useState(false)
+  const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
+  const [postPhase, setPostPhase] = useState<UploadPhase>('idle')
+  const mediaInputRef = useRef<HTMLInputElement>(null)
+  const docInputRef = useRef<HTMLInputElement>(null)
+
+  const { data: posts, isLoading, isError, refetch } = useQuery({
+    queryKey: ['feed'],
+    queryFn: () => listFeed(),
+  })
+
+  const filteredPosts = useMemo(() => {
+    if (!posts) return []
+    if (tab === 'saved') {
+      return posts.filter((p) => p.isSaved)
+    }
+    return posts
+  }, [posts, tab])
+
+  const postMutation = useMutation({
+    mutationFn: async () => {
+      const attachments = await Promise.all(pendingFiles.map((p) => uploadAttachment(p.file)))
+      return createPost(content.trim(), 'text', undefined, attachments)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed'] })
+      pendingFiles.forEach((p) => p.previewUrl && URL.revokeObjectURL(p.previewUrl))
+      setContent('')
+      setPendingFiles([])
+      setIsFocused(false)
+      setPostPhase('done')
+      setTimeout(() => setPostPhase('idle'), 1200)
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Could not create post')
+      setPostPhase('idle')
+    },
+  })
+
+  function handlePost() {
+    setPostPhase('uploading')
+    postMutation.mutate()
+  }
+
+  function addFiles(e: ChangeEvent<HTMLInputElement>) {
+    const selected = Array.from(e.target.files ?? []).filter((f) => pickKind(f) !== null)
+    setPendingFiles((prev) => {
+      const combined = [
+        ...prev,
+        ...selected.map((file) => ({
+          file,
+          previewUrl: file.type.startsWith('image/') ? URL.createObjectURL(file) : undefined,
+        })),
+      ]
+      if (combined.length > MAX_ATTACHMENTS) {
+        toast.error(`You can attach up to ${MAX_ATTACHMENTS} files`)
+        return combined.slice(0, MAX_ATTACHMENTS)
+      }
+      return combined
+    })
+    e.target.value = ''
+  }
+
+  function removeFile(index: number) {
+    setPendingFiles((prev) => {
+      const removed = prev[index]
+      if (removed?.previewUrl) URL.revokeObjectURL(removed.previewUrl)
+      return prev.filter((_, i) => i !== index)
+    })
+  }
+
+  const canPost = (content.trim().length > 0 || pendingFiles.length > 0) && !postMutation.isPending
+
+  return (
+    <div className="max-w-[620px] mx-auto flex flex-col gap-6">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-fg tracking-tight">Community Feed</h1>
+          <p className="text-sm text-fg-muted mt-0.5">Updates, questions, and wins from founders and builders.</p>
+        </div>
+        <PillTabs items={FEED_TABS} value={tab} onChange={setTab} />
+      </div>
+
+      {tab === 'all' && (
+        <Card className="flex flex-col gap-3 shadow-sm border-border/80 p-4 sm:p-5">
+          <div className="flex gap-3">
+            <Avatar src={currentUser?.avatarUrl} name={currentUser?.name ?? ''} size="md" />
+            <div className="flex-1 flex flex-col gap-2 min-w-0">
+              <textarea
+                value={content}
+                onChange={(e) => setContent(e.target.value)}
+                onFocus={() => setIsFocused(true)}
+                placeholder="Share an update, ask for feedback, or celebrate a milestone…"
+                rows={isFocused || content || pendingFiles.length > 0 ? 3 : 2}
+                className="w-full resize-none rounded-xl border border-border/80 bg-surface-sunken/40 px-3.5 py-2.5 text-sm text-fg outline-none focus:border-brand-500 focus:bg-surface focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-fg-muted leading-relaxed"
+              />
+
+              {pendingFiles.length > 0 && (
+                <div className="flex flex-wrap gap-2.5 pt-1">
+                  {pendingFiles.map((p, i) => {
+                    const kind = pickKind(p.file)
+                    return (
+                      <div
+                        key={i}
+                        className="relative size-18 rounded-xl overflow-hidden border border-border/80 bg-surface-sunken shrink-0 shadow-2xs group"
+                      >
+                        {p.previewUrl ? (
+                          <img src={p.previewUrl} alt="" className="size-full object-cover" />
+                        ) : (
+                          <div className="size-full flex flex-col items-center justify-center gap-1 p-1 text-center bg-surface-sunken">
+                            {kind === 'video' ? (
+                              <Video className="size-5 text-brand-600 dark:text-brand-400" />
+                            ) : (
+                              <FileText className="size-5 text-accent-500" />
+                            )}
+                            <span className="text-[10px] font-medium text-fg-muted truncate w-full px-1">
+                              {p.file.name}
+                            </span>
+                          </div>
+                        )}
+                        <UploadSpinnerOverlay phase={postPhase} />
+                        {postPhase === 'idle' && (
+                          <button
+                            type="button"
+                            onClick={() => removeFile(i)}
+                            className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-neutral-900/80 text-white hover:bg-neutral-900 cursor-pointer transition-colors shadow-xs"
+                            aria-label="Remove attachment"
+                          >
+                            <X className="size-3" />
+                          </button>
+                        )}
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+
+              <div className="flex items-center justify-between pt-1 mt-1 border-t border-border/60">
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={() => mediaInputRef.current?.click()}
+                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
+                  >
+                    <Image className="size-4 text-brand-600 dark:text-brand-400" /> Photo/Video
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => docInputRef.current?.click()}
+                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
+                  >
+                    <FileText className="size-4 text-accent-500" /> Document (PDF)
+                  </button>
+                  <input
+                    ref={mediaInputRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    multiple
+                    hidden
+                    onChange={addFiles}
+                  />
+                  <input
+                    ref={docInputRef}
+                    type="file"
+                    accept="application/pdf"
+                    multiple
+                    hidden
+                    onChange={addFiles}
+                  />
+                </div>
+                <UploadButton
+                  size="sm"
+                  phase={postPhase}
+                  idleLabel="Post"
+                  leftIcon={postPhase === 'idle' ? <Send className="size-3.5" /> : undefined}
+                  uploadingLabel={pendingFiles.length > 0 ? 'Uploading…' : 'Posting…'}
+                  doneLabel="Posted"
+                  disabled={!canPost}
+                  onClick={handlePost}
+                />
+              </div>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {isLoading ? (
+        <CardSkeletonGrid count={3} />
+      ) : isError ? (
+        <EmptyState
+          title="Could not load feed"
+          description="Something went wrong while loading updates. Please try again."
+          action={
+            <button
+              onClick={() => refetch()}
+              className="text-sm font-semibold text-brand-600 hover:text-brand-700 underline"
+            >
+              Retry
+            </button>
+          }
+        />
+      ) : filteredPosts && filteredPosts.length > 0 ? (
+        tab === 'saved' ? (
+          <SavedPostsGrid posts={filteredPosts} />
+        ) : (
+          <div className="flex flex-col gap-5">
+            {filteredPosts.map((post) => (
+              <PostCard key={post.id} post={post} />
+            ))}
+          </div>
+        )
+      ) : tab === 'saved' ? (
+        <EmptyState
+          icon={<Bookmark className="size-6" />}
+          title="No saved posts yet"
+          description="Click the bookmark icon on any post in your feed to save it for later reference."
+        />
+      ) : (
+        <EmptyState
+          icon={<Sparkles className="size-6" />}
+          title="Your feed is waiting for your voice"
+          description="Be the first to share an update, showcase a project, or ask a question to the community."
+        />
+      )}
+    </div>
+  )
+}
+

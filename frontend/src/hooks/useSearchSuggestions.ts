@@ -1,0 +1,72 @@
+import { useEffect, useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { listUsers } from '@/services/users.service'
+import { listIdeas } from '@/services/ideas.service'
+import { listStartups } from '@/services/startups.service'
+import { listOpportunities } from '@/services/opportunities.service'
+import { listEvents } from '@/services/events.service'
+
+const SUGGESTIONS_PER_CATEGORY = 5
+const DEBOUNCE_MS = 250
+const MIN_QUERY_LENGTH = 2
+
+export function useSearchSuggestions(rawQuery: string) {
+  const [debounced, setDebounced] = useState('')
+
+  useEffect(() => {
+    const trimmed = rawQuery.trim()
+    const timer = setTimeout(() => setDebounced(trimmed), DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [rawQuery])
+
+  const enabled = debounced.length >= MIN_QUERY_LENGTH
+
+  const people = useQuery({
+    queryKey: ['search-suggestions', 'people', debounced],
+    queryFn: () => listUsers({ query: debounced, size: SUGGESTIONS_PER_CATEGORY }),
+    enabled,
+  })
+  const ideas = useQuery({
+    queryKey: ['search-suggestions', 'ideas', debounced],
+    queryFn: () => listIdeas({ query: debounced, size: SUGGESTIONS_PER_CATEGORY }),
+    enabled,
+  })
+  const startups = useQuery({
+    queryKey: ['search-suggestions', 'startups', debounced],
+    queryFn: () => listStartups({ query: debounced, size: SUGGESTIONS_PER_CATEGORY }),
+    enabled,
+  })
+  const opportunities = useQuery({
+    queryKey: ['search-suggestions', 'opportunities', debounced],
+    queryFn: () => listOpportunities({ query: debounced, size: SUGGESTIONS_PER_CATEGORY }),
+    enabled,
+  })
+  const events = useQuery({
+    queryKey: ['search-suggestions', 'events', debounced],
+    queryFn: () => listEvents({ query: debounced, size: SUGGESTIONS_PER_CATEGORY }),
+    enabled,
+  })
+
+  const queries = [people, ideas, startups, opportunities, events]
+  const isLoading = enabled && queries.some((q) => q.isLoading)
+  const isError = queries.some((q) => q.isError)
+  const totalCount =
+    (people.data?.length ?? 0) +
+    (ideas.data?.length ?? 0) +
+    (startups.data?.length ?? 0) +
+    (opportunities.data?.length ?? 0) +
+    (events.data?.length ?? 0)
+
+  return {
+    debounced,
+    enabled,
+    isLoading,
+    isError,
+    hasResults: totalCount > 0,
+    people: people.data ?? [],
+    ideas: ideas.data ?? [],
+    startups: startups.data ?? [],
+    opportunities: opportunities.data ?? [],
+    events: events.data ?? [],
+  }
+}

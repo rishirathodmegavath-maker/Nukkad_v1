@@ -1,0 +1,11 @@
+# OS junk
+.DS_Store
+Thumbs.db
+
+# Raw DB dumps / backups — not source code (backend's Flyway migrations under
+# src/main/resources/db/migration are real source and must stay tracked)
+nukkad_before_cleanup.sql
+
+# Standalone pre-monorepo git histories, kept on disk for reference only —
+# must never be staged or committed.
+**/.git-standalone-history-backup/
