@@ -78,7 +78,7 @@ export default function LoginPage() {
         <Button type="submit" size="lg" isLoading={isLoading} className="w-full mt-2">
           Log in
         </Button>
-        <GoogleSignInButton onSuccess={(isNewUser) => (isNewUser ? navigate('/onboarding') : goHome())} />
+        <GoogleSignInButton />
       </form>
     </AuthLayout>
   )

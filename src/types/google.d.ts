@@ -1,19 +1,23 @@
-interface GoogleCredentialResponse {
-  credential: string
+interface GoogleCodeResponse {
+  code?: string
+  error?: string
+}
+
+interface GoogleCodeClient {
+  requestCode: () => void
 }
 
 interface Window {
   google?: {
     accounts: {
-      id: {
-        initialize: (config: {
+      oauth2: {
+        initCodeClient: (config: {
           client_id: string
-          callback: (response: GoogleCredentialResponse) => void
-        }) => void
-        renderButton: (
-          parent: HTMLElement,
-          options: { theme?: string; size?: string; width?: number; text?: string },
-        ) => void
+          scope: string
+          ux_mode: 'redirect'
+          redirect_uri: string
+          state?: string
+        }) => GoogleCodeClient
       }
     }
   }

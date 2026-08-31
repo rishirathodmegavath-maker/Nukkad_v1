@@ -42,6 +42,15 @@ export async function loginWithGoogle(idToken: string): Promise<{ session: Sessi
   return { session, isNewUser: !!dto.isNewUser }
 }
 
+/** Redirect-flow counterpart: exchanges the OAuth authorization code Google handed back after
+ * the full-page redirect for a Nukkad session, via the backend (which holds the client secret). */
+export async function exchangeGoogleCode(code: string, redirectUri: string): Promise<{ session: Session; isNewUser: boolean }> {
+  const dto = await apiClient.post<AuthResponseDto>('/auth/google/code', { code, redirectUri })
+  const session = toSession(dto)
+  persistSession(session)
+  return { session, isNewUser: !!dto.isNewUser }
+}
+
 export async function requestPasswordReset(email: string): Promise<{ sent: true }> {
   await apiClient.post('/auth/password-reset/request', { email })
   return { sent: true }

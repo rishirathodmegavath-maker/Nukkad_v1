@@ -10,7 +10,7 @@ interface AuthState {
   init: () => void
   login: (credentials: LoginCredentials) => Promise<void>
   signup: (payload: SignupPayload) => Promise<void>
-  loginWithGoogle: (idToken: string) => Promise<{ isNewUser: boolean }>
+  completeGoogleLogin: (code: string, redirectUri: string) => Promise<{ isNewUser: boolean }>
   logout: () => Promise<void>
 }
 
@@ -32,8 +32,8 @@ export const useAuthStore = create<AuthState>((set) => ({
     queryClient.clear()
     set({ session, isAuthenticated: true })
   },
-  loginWithGoogle: async (idToken) => {
-    const { session, isNewUser } = await authService.loginWithGoogle(idToken)
+  completeGoogleLogin: async (code, redirectUri) => {
+    const { session, isNewUser } = await authService.exchangeGoogleCode(code, redirectUri)
     queryClient.clear()
     set({ session, isAuthenticated: true })
     return { isNewUser }

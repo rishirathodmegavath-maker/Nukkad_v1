@@ -79,7 +79,7 @@ export default function SignupPage() {
         <p className="text-xs text-fg-muted text-center">
           By continuing you agree to Nukkad’s Terms and Privacy Policy.
         </p>
-        <GoogleSignInButton onSuccess={(isNewUser) => navigate(isNewUser ? '/onboarding' : '/')} />
+        <GoogleSignInButton />
       </form>
     </AuthLayout>
   )

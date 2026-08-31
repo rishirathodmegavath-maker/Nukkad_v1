@@ -5,6 +5,8 @@ import { AppShell } from '@/components/layout/AppShell'
 import LoginPage from '@/pages/auth/LoginPage'
 import SignupPage from '@/pages/auth/SignupPage'
 import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage'
+import GoogleCallbackPage from '@/pages/auth/GoogleCallbackPage'
+import { GOOGLE_CALLBACK_PATH } from '@/lib/google-auth'
 import OnboardingPage from '@/pages/onboarding/OnboardingPage'
 
 import HomePage from '@/pages/home/HomePage'
@@ -47,6 +49,10 @@ export function AppRoutes() {
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       </Route>
+
+      {/* Unguarded: this is the landing page for Google's OAuth redirect, reached mid-login
+          before any session exists — neither PublicOnlyRoute nor ProtectedRoute apply. */}
+      <Route path={GOOGLE_CALLBACK_PATH} element={<GoogleCallbackPage />} />
 
       <Route element={<ProtectedRoute />}>
         <Route path="/onboarding" element={<OnboardingPage />} />
