@@ -230,21 +230,25 @@ export default function FeedPage() {
                 </div>
               )}
 
-              <div className="flex items-center justify-between pt-1 mt-1 border-t border-border/60">
-                <div className="flex items-center gap-1.5">
+              <div className="flex items-center justify-between gap-2 pt-1 mt-1 border-t border-border/60">
+                <div className="flex items-center gap-2">
                   <button
                     type="button"
                     onClick={() => mediaInputRef.current?.click()}
-                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
+                    aria-label="Add photo or video"
+                    className="flex items-center justify-center gap-1.5 h-9 px-2.5 sm:px-3 rounded-xl text-xs font-semibold text-fg-secondary bg-surface-sunken/60 hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors shrink-0"
                   >
-                    <Image className="size-4 text-brand-600 dark:text-brand-400" /> Photo/Video
+                    <Image className="size-4 text-brand-600 dark:text-brand-400 shrink-0" />
+                    <span className="hidden sm:inline">Photo/Video</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => docInputRef.current?.click()}
-                    className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-fg-secondary hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
+                    aria-label="Add document (PDF)"
+                    className="flex items-center justify-center gap-1.5 h-9 px-2.5 sm:px-3 rounded-xl text-xs font-semibold text-fg-secondary bg-surface-sunken/60 hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors shrink-0"
                   >
-                    <FileText className="size-4 text-accent-500" /> Document (PDF)
+                    <FileText className="size-4 text-accent-500 shrink-0" />
+                    <span className="hidden sm:inline">Document (PDF)</span>
                   </button>
                   <input
                     ref={mediaInputRef}
@@ -264,7 +268,8 @@ export default function FeedPage() {
                   />
                 </div>
                 <UploadButton
-                  size="sm"
+                  size="md"
+                  className="shrink-0"
                   phase={postPhase}
                   idleLabel="Post"
                   leftIcon={postPhase === 'idle' ? <Send className="size-3.5" /> : undefined}
