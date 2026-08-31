@@ -442,7 +442,11 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
         </div>
 
         <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 sm:px-8 py-4">
-          <div className="max-w-[900px] mx-auto flex flex-col w-full">
+          {/* min-h-full + justify-end anchors a short conversation to the bottom, right above the
+              composer, instead of pinning it to the top and leaving a large dead gap above the
+              input — matches how every mainstream chat app lays out a thread with few messages.
+              Once messages overflow the container, this has no effect and it scrolls normally. */}
+          <div className="max-w-[900px] mx-auto flex flex-col w-full min-h-full justify-end">
             {isLoading ? (
               <Skeleton className="h-10 w-2/3 rounded-lg" />
             ) : (
