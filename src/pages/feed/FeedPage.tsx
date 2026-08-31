@@ -1,12 +1,12 @@
 import { useRef, useState, useMemo, type ChangeEvent } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Send, Image, FileText, X, Video, Bookmark, Sparkles } from 'lucide-react'
+import { Send, Image, FileText, X, Video, Bookmark, Sparkles, Plus } from 'lucide-react'
 import { listFeed, createPost, uploadAttachment } from '@/services/feed.service'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { PostCard } from '@/components/domain/PostCard'
-import { Card } from '@/components/ui/Card'
 import { Avatar } from '@/components/ui/Avatar'
+import { Modal } from '@/components/ui/Modal'
 import { PillTabs } from '@/components/ui/Tabs'
 import { UploadButton, UploadSpinnerOverlay, type UploadPhase } from '@/components/ui/UploadButton'
 import { CardSkeletonGrid } from '@/components/ui/Skeleton'
@@ -78,8 +78,8 @@ export default function FeedPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const tab = searchParams.get('tab') === 'saved' ? 'saved' : 'all'
   const setTab = (next: string) => setSearchParams(next === 'saved' ? { tab: 'saved' } : {})
+  const [isComposerOpen, setIsComposerOpen] = useState(false)
   const [content, setContent] = useState('')
-  const [isFocused, setIsFocused] = useState(false)
   const [pendingFiles, setPendingFiles] = useState<PendingFile[]>([])
   const [postPhase, setPostPhase] = useState<UploadPhase>('idle')
   const mediaInputRef = useRef<HTMLInputElement>(null)
@@ -108,7 +108,7 @@ export default function FeedPage() {
       pendingFiles.forEach((p) => p.previewUrl && URL.revokeObjectURL(p.previewUrl))
       setContent('')
       setPendingFiles([])
-      setIsFocused(false)
+      setIsComposerOpen(false)
       setPostPhase('done')
       setTimeout(() => setPostPhase('idle'), 1200)
     },
@@ -163,16 +163,36 @@ export default function FeedPage() {
       </div>
 
       {tab === 'all' && (
-        <Card className="flex flex-col gap-3 shadow-sm border-border/80 p-4 sm:p-5">
+        <button
+          type="button"
+          onClick={() => setIsComposerOpen(true)}
+          className="flex items-center gap-3 rounded-xl border border-border/80 bg-surface p-4 text-left shadow-xs transition-all duration-150 hover:border-border-strong active:scale-[0.995] cursor-pointer"
+        >
+          <Avatar src={currentUser?.avatarUrl} name={currentUser?.name ?? ''} size="md" />
+          <span className="flex-1 min-w-0 truncate text-sm text-fg-muted">
+            Share an update, ask for feedback, or celebrate a milestone…
+          </span>
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-brand-500 text-white">
+            <Plus className="size-4.5" />
+          </span>
+        </button>
+      )}
+
+      <Modal
+        open={isComposerOpen}
+        onClose={() => setIsComposerOpen(false)}
+        title="Create post"
+      >
+        <div className="flex flex-col gap-3">
           <div className="flex gap-3">
             <Avatar src={currentUser?.avatarUrl} name={currentUser?.name ?? ''} size="md" />
             <div className="flex-1 flex flex-col gap-2 min-w-0">
               <textarea
+                autoFocus
                 value={content}
                 onChange={(e) => setContent(e.target.value)}
-                onFocus={() => setIsFocused(true)}
                 placeholder="Share an update, ask for feedback, or celebrate a milestone…"
-                rows={isFocused || content || pendingFiles.length > 0 ? 3 : 2}
+                rows={4}
                 className="w-full resize-none rounded-xl border border-border/80 bg-surface-sunken/40 px-3.5 py-2.5 text-sm text-fg outline-none focus:border-brand-500 focus:bg-surface focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-fg-muted leading-relaxed"
               />
 
@@ -262,8 +282,8 @@ export default function FeedPage() {
               </div>
             </div>
           </div>
-        </Card>
-      )}
+        </div>
+      </Modal>
 
       {isLoading ? (
         <CardSkeletonGrid count={3} />
