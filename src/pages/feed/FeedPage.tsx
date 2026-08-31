@@ -154,13 +154,7 @@ export default function FeedPage() {
 
   return (
     <div className="max-w-[620px] mx-auto flex flex-col gap-6">
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-fg tracking-tight">Community Feed</h1>
-          <p className="text-sm text-fg-muted mt-0.5">Updates, questions, and wins from founders and builders.</p>
-        </div>
-        <PillTabs items={FEED_TABS} value={tab} onChange={setTab} />
-      </div>
+      <PillTabs items={FEED_TABS} value={tab} onChange={setTab} className="self-start" />
 
       {tab === 'all' && (
         <button
