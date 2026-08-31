@@ -61,6 +61,23 @@ export function useMessages(conversationId: string | undefined) {
   })
 }
 
+/** "Delete for me": hides the given message(s) from only the current user's own view — invalidating
+ * both queries reflects that in this browser immediately; no WS event exists for this because the
+ * other participant's view is never touched, so there's nothing for their client to react to. */
+export function useHideMessagesForMe(conversationId: string | undefined) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (messageIds: string[]) =>
+      messageIds.length === 1
+        ? messagesService.hideMessageForMe(conversationId!, messageIds[0])
+        : messagesService.hideMessagesForMe(conversationId!, messageIds),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['messages', conversationId] })
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    },
+  })
+}
+
 export function useSendMessage(conversationId: string | undefined) {
   const queryClient = useQueryClient()
   return useMutation({

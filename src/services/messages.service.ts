@@ -97,3 +97,14 @@ export async function setConversationNickname(conversationId: string, nickname: 
 export async function deleteConversation(conversationId: string): Promise<void> {
   await apiClient.delete(`/conversations/${conversationId}`)
 }
+
+/** "Delete for me": hides this message from the current user's own view only — the other participant still sees it. */
+export async function hideMessageForMe(conversationId: string, messageId: string): Promise<void> {
+  await apiClient.delete(`/conversations/${conversationId}/messages/${messageId}`)
+}
+
+/** Bulk "delete for me": hides the given messages from the current user's own view only. */
+export async function hideMessagesForMe(conversationId: string, messageIds: string[]): Promise<void> {
+  const query = messageIds.map((id) => `messageIds=${encodeURIComponent(id)}`).join('&')
+  await apiClient.delete(`/conversations/${conversationId}/messages?${query}`)
+}

@@ -241,6 +241,7 @@ export function PostCard({ post }: { post: Post }) {
   const likeMutation = useMutation({
     mutationFn: () => feedService.toggleLike(post.id),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['feed'] }),
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not update like'),
   })
   const saveMutation = useMutation({
     mutationFn: () => feedService.toggleSave(post.id),
@@ -391,8 +392,9 @@ export function PostCard({ post }: { post: Post }) {
         <button
           type="button"
           onClick={() => likeMutation.mutate()}
+          disabled={likeMutation.isPending}
           className={cn(
-            'flex items-center gap-1.5 text-sm cursor-pointer transition-all duration-150 active:scale-90 font-medium',
+            'flex items-center gap-1.5 text-sm cursor-pointer transition-all duration-150 active:scale-90 font-medium disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100',
             post.isLiked ? 'text-rose-500' : 'text-fg-secondary hover:text-fg',
           )}
           aria-label={post.isLiked ? 'Unlike post' : 'Like post'}

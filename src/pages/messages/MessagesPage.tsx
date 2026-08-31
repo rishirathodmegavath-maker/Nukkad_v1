@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Send, MessageSquare, Info, X, Bell, UserX, Flag, Trash2, ImageOff, ArrowLeft } from 'lucide-react'
-import { useConversations, useMessages, useSendMessage, useMarkConversationRead } from '@/hooks/useConversations'
+import { Send, MessageSquare, Info, X, Bell, UserX, Flag, Trash2, ImageOff, ArrowLeft, MoreHorizontal, CheckSquare, Check } from 'lucide-react'
+import { useConversations, useMessages, useSendMessage, useMarkConversationRead, useHideMessagesForMe } from '@/hooks/useConversations'
 import { useUser } from '@/hooks/useUser'
 import { getCurrentUserId } from '@/services/users.service'
 import * as usersService from '@/services/users.service'
@@ -10,6 +10,7 @@ import * as messagesService from '@/services/messages.service'
 import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
+import { DropdownMenu, DropdownItem } from '@/components/ui/DropdownMenu'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ReportModal } from '@/components/domain/ReportModal'
@@ -296,9 +297,41 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
   const sendMutation = useSendMessage(conversationId)
   const markReadMutation = useMarkConversationRead(conversationId)
   const markRead = markReadMutation.mutate
+  const hideMessagesMutation = useHideMessagesForMe(conversationId)
   const [draft, setDraft] = useState('')
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [deleteTarget, setDeleteTarget] = useState<string[] | null>(null)
   const myId = getCurrentUserId()
+
+  function toggleSelected(messageId: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(messageId)) next.delete(messageId)
+      else next.add(messageId)
+      return next
+    })
+  }
+
+  function exitSelectMode() {
+    setSelectMode(false)
+    setSelectedIds(new Set())
+  }
+
+  function confirmDelete() {
+    if (!deleteTarget) return
+    hideMessagesMutation.mutate(deleteTarget, {
+      onSuccess: () => {
+        toast.success(deleteTarget.length > 1 ? 'Messages removed from your view' : 'Message removed from your view')
+        setDeleteTarget(null)
+        exitSelectMode()
+      },
+      onError: (err) => {
+        toast.error(err instanceof Error ? err.message : 'Could not remove message')
+      },
+    })
+  }
 
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -342,33 +375,68 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
     <div className="flex h-full flex-1 min-w-0">
       <div className="flex flex-col flex-1 min-w-0">
         <div className="flex items-center justify-between gap-3 px-4 sm:px-5 py-3.5 border-b border-border/70 bg-surface">
-          <div className="flex items-center gap-2 min-w-0">
-            <button
-              onClick={() => navigate('/messages')}
-              className="sm:hidden flex size-8 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-hover hover:text-fg -ml-1 cursor-pointer transition-colors"
-              aria-label="Back to messages"
-            >
-              <ArrowLeft className="size-5" />
-            </button>
-            {otherUser && (
-              <Link to={`/people/${otherUser.id}`} className="flex items-center gap-2.5 min-w-0 hover:opacity-80 transition-opacity">
-                <Avatar src={otherUser.avatarUrl} name={otherUser.name} size="sm" />
-                <p className="font-bold text-fg text-sm truncate">{currentConversation?.nickname || otherUser.name}</p>
-              </Link>
-            )}
-          </div>
-          <div className="flex items-center gap-1 shrink-0">
-            <button
-              onClick={() => setDetailsOpen((o) => !o)}
-              className={cn(
-                'flex size-8 items-center justify-center rounded-lg cursor-pointer transition-colors',
-                detailsOpen ? 'bg-surface-selected text-brand-600' : 'text-fg-muted hover:bg-surface-hover hover:text-fg',
-              )}
-              aria-label="Conversation details"
-            >
-              <Info className="size-4.5" />
-            </button>
-          </div>
+          {selectMode ? (
+            <>
+              <div className="flex items-center gap-2.5 min-w-0">
+                <button
+                  onClick={exitSelectMode}
+                  aria-label="Cancel selection"
+                  className="flex size-8 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
+                >
+                  <X className="size-5" />
+                </button>
+                <p className="text-sm font-semibold text-fg">{selectedIds.size} selected</p>
+              </div>
+              <Button
+                size="sm"
+                variant="danger-subtle"
+                leftIcon={<Trash2 className="size-4" />}
+                disabled={selectedIds.size === 0}
+                onClick={() => setDeleteTarget([...selectedIds])}
+              >
+                Delete for me
+              </Button>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 min-w-0">
+                <button
+                  onClick={() => navigate('/messages')}
+                  className="sm:hidden flex size-8 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-hover hover:text-fg -ml-1 cursor-pointer transition-colors"
+                  aria-label="Back to messages"
+                >
+                  <ArrowLeft className="size-5" />
+                </button>
+                {otherUser && (
+                  <Link to={`/people/${otherUser.id}`} className="flex items-center gap-2.5 min-w-0 hover:opacity-80 transition-opacity">
+                    <Avatar src={otherUser.avatarUrl} name={otherUser.name} size="sm" />
+                    <p className="font-bold text-fg text-sm truncate">{currentConversation?.nickname || otherUser.name}</p>
+                  </Link>
+                )}
+              </div>
+              <div className="flex items-center gap-1 shrink-0">
+                {messages && messages.length > 0 && (
+                  <button
+                    onClick={() => setSelectMode(true)}
+                    className="flex size-8 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
+                    aria-label="Select messages"
+                  >
+                    <CheckSquare className="size-4.5" />
+                  </button>
+                )}
+                <button
+                  onClick={() => setDetailsOpen((o) => !o)}
+                  className={cn(
+                    'flex size-8 items-center justify-center rounded-lg cursor-pointer transition-colors',
+                    detailsOpen ? 'bg-surface-selected text-brand-600' : 'text-fg-muted hover:bg-surface-hover hover:text-fg',
+                  )}
+                  aria-label="Conversation details"
+                >
+                  <Info className="size-4.5" />
+                </button>
+              </div>
+            </>
+          )}
         </div>
 
         <div ref={scrollContainerRef} onScroll={handleScroll} className="flex-1 overflow-y-auto px-4 sm:px-8 py-4">
@@ -384,6 +452,9 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                   {group.messages.map((msg, mi) => {
                     const isOwn = msg.senderId === myId
                     const isLast = mi === group.messages.length - 1
+                    // "Delete for me" only ever changes the current user's own visibility, so it's
+                    // available on every message — including ones sent by the other participant.
+                    const isSelected = selectedIds.has(msg.id)
                     return (
                       <div key={msg.id} className={cn('flex items-end gap-2', isOwn ? 'self-end flex-row-reverse' : 'self-start')}>
                         {!isOwn &&
@@ -392,28 +463,82 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                           ) : (
                             <span className="size-6 shrink-0" />
                           ))}
+
+                        {selectMode && (
+                          <button
+                            type="button"
+                            onClick={() => toggleSelected(msg.id)}
+                            aria-label={isSelected ? 'Deselect message' : 'Select message'}
+                            className={cn(
+                              'flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors cursor-pointer',
+                              isSelected ? 'bg-brand-600 border-brand-600 text-white' : 'border-border-strong hover:border-brand-500',
+                            )}
+                          >
+                            {isSelected && <Check className="size-3" />}
+                          </button>
+                        )}
+
                         {msg.type === 'SHARED_POST' ? (
-                          <div className="flex flex-col gap-1.5 max-w-[85%] sm:max-w-[75%]">
-                            <SharedPostPreview message={msg} conversationId={conversationId} />
-                            {msg.content && (
-                              <div
-                                className={cn(
-                                  'rounded-2xl px-4 py-2.5 text-sm self-start leading-relaxed',
-                                  isOwn ? 'bg-brand-600 text-white rounded-br-sm self-end' : 'bg-surface-sunken text-fg rounded-bl-sm border border-border/60',
-                                )}
+                          <div className="flex items-end gap-1">
+                            <div className={cn('flex flex-col gap-1.5 max-w-[85%] sm:max-w-[75%]', isOwn && 'items-end')}>
+                              <SharedPostPreview message={msg} conversationId={conversationId} />
+                              {msg.content && (
+                                <div
+                                  className={cn(
+                                    'rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
+                                    isOwn ? 'bg-brand-600 text-white rounded-br-sm' : 'bg-surface-sunken text-fg rounded-bl-sm border border-border/60',
+                                  )}
+                                >
+                                  {msg.content}
+                                </div>
+                              )}
+                            </div>
+                            {!selectMode && (
+                              <DropdownMenu
+                                trigger={
+                                  <button
+                                    type="button"
+                                    className="flex size-7 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
+                                    aria-label="Message options"
+                                  >
+                                    <MoreHorizontal className="size-4" />
+                                  </button>
+                                }
                               >
-                                {msg.content}
-                              </div>
+                                <DropdownItem danger icon={<Trash2 className="size-4" />} onClick={() => setDeleteTarget([msg.id])}>
+                                  Delete for me
+                                </DropdownItem>
+                              </DropdownMenu>
                             )}
                           </div>
                         ) : (
-                          <div
-                            className={cn(
-                              'max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
-                              isOwn ? 'bg-brand-600 text-white rounded-br-sm shadow-2xs' : 'bg-surface-sunken text-fg rounded-bl-sm border border-border/60',
+                          <div className={cn('flex items-end gap-1', isOwn && 'flex-row-reverse')}>
+                            <div
+                              className={cn(
+                                'max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
+                                isOwn ? 'bg-brand-600 text-white rounded-br-sm shadow-2xs' : 'bg-surface-sunken text-fg rounded-bl-sm border border-border/60',
+                              )}
+                            >
+                              {msg.content}
+                            </div>
+                            {!selectMode && (
+                              <DropdownMenu
+                                align={isOwn ? 'left' : 'right'}
+                                trigger={
+                                  <button
+                                    type="button"
+                                    className="flex size-7 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
+                                    aria-label="Message options"
+                                  >
+                                    <MoreHorizontal className="size-4" />
+                                  </button>
+                                }
+                              >
+                                <DropdownItem danger icon={<Trash2 className="size-4" />} onClick={() => setDeleteTarget([msg.id])}>
+                                  Delete for me
+                                </DropdownItem>
+                              </DropdownMenu>
                             )}
-                          >
-                            {msg.content}
                           </div>
                         )}
                       </div>
@@ -453,6 +578,31 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
       {detailsOpen && currentConversation && otherUser && (
         <DetailsPanel conversation={currentConversation} otherUser={otherUser} onClose={() => setDetailsOpen(false)} />
       )}
+
+      <Modal open={deleteTarget !== null} onClose={() => setDeleteTarget(null)} size="sm">
+        <div className="flex flex-col items-center text-center gap-2 pb-4">
+          <p className="text-lg font-semibold text-fg">
+            {deleteTarget && deleteTarget.length > 1 ? `Delete ${deleteTarget.length} messages for you?` : 'Delete this message for you?'}
+          </p>
+          <p className="text-sm text-fg-muted">
+            This can't be undone. It only removes {deleteTarget && deleteTarget.length > 1 ? 'them' : 'it'} from your own view —{' '}
+            {otherUser?.name ?? 'the other person'} won't be notified and will still see{' '}
+            {deleteTarget && deleteTarget.length > 1 ? 'them' : 'it'} normally.
+          </p>
+        </div>
+        <div className="-mx-5 -mb-5 border-t border-border-subtle flex flex-col">
+          <button
+            onClick={confirmDelete}
+            disabled={hideMessagesMutation.isPending}
+            className="py-3 text-sm font-semibold text-danger-500 hover:bg-surface-hover cursor-pointer border-b border-border-subtle disabled:opacity-50"
+          >
+            {hideMessagesMutation.isPending ? 'Deleting…' : 'Delete for me'}
+          </button>
+          <button onClick={() => setDeleteTarget(null)} className="py-3 text-sm text-fg hover:bg-surface-hover cursor-pointer">
+            Cancel
+          </button>
+        </div>
+      </Modal>
     </div>
   )
 }
