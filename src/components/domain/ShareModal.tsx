@@ -32,7 +32,7 @@ function ConnectionTile({
     <button
       onClick={onToggle}
       disabled={sent || disabled}
-      className="flex flex-col items-center gap-1.5 cursor-pointer disabled:cursor-default"
+      className="flex flex-col items-center gap-1.5 cursor-pointer disabled:cursor-default rounded-lg p-1 -m-1 transition-colors hover:bg-surface-hover disabled:hover:bg-transparent"
     >
       <span className="relative">
         <Avatar src={user.avatarUrl} name={user.name} size="lg" className={selected ? 'ring-2 ring-brand-500 ring-offset-2 ring-offset-surface rounded-full' : ''} />
@@ -164,46 +164,46 @@ export function ShareModal({ open, onClose, post }: ShareModalProps) {
         )}
 
         <div className="flex items-center gap-6 overflow-x-auto border-t border-border-subtle pt-4 -mx-5 px-5">
-          <button onClick={copyLink} className="flex shrink-0 flex-col items-center gap-1.5 cursor-pointer">
-            <span className="flex size-11 items-center justify-center rounded-full bg-surface-sunken text-fg">
+          <button onClick={copyLink} className="group flex shrink-0 flex-col items-center gap-1.5 cursor-pointer">
+            <span className="flex size-11 items-center justify-center rounded-full bg-surface-sunken text-fg transition-all duration-150 group-hover:scale-110 group-hover:shadow-md group-active:scale-100">
               <Link2 className="size-[18px]" />
             </span>
             <span className="text-[11px] text-fg-secondary">Copy Link</span>
           </button>
           <button
             onClick={() => openExternal(`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`)}
-            className="flex shrink-0 flex-col items-center gap-1.5 cursor-pointer"
+            className="group flex shrink-0 flex-col items-center gap-1.5 cursor-pointer"
           >
-            <span className="flex size-11 items-center justify-center rounded-full bg-[#0A66C2] text-white text-sm font-bold">in</span>
+            <span className="flex size-11 items-center justify-center rounded-full bg-[#0A66C2] text-white text-sm font-bold transition-all duration-150 group-hover:scale-110 group-hover:shadow-md group-active:scale-100">in</span>
             <span className="text-[11px] text-fg-secondary">LinkedIn</span>
           </button>
-          <button onClick={() => openExternal(`https://wa.me/?text=${encodeURIComponent(shareText)}`)} className="flex shrink-0 flex-col items-center gap-1.5 cursor-pointer">
-            <span className="flex size-11 items-center justify-center rounded-full bg-[#25D366] text-white">
+          <button onClick={() => openExternal(`https://wa.me/?text=${encodeURIComponent(shareText)}`)} className="group flex shrink-0 flex-col items-center gap-1.5 cursor-pointer">
+            <span className="flex size-11 items-center justify-center rounded-full bg-[#25D366] text-white transition-all duration-150 group-hover:scale-110 group-hover:shadow-md group-active:scale-100">
               <MessageCircle className="size-[18px]" />
             </span>
             <span className="text-[11px] text-fg-secondary">WhatsApp</span>
           </button>
           <button
             onClick={() => openExternal(`mailto:?subject=${encodeURIComponent('Check this out on Nukkad')}&body=${encodeURIComponent(shareText)}`)}
-            className="flex shrink-0 flex-col items-center gap-1.5 cursor-pointer"
+            className="group flex shrink-0 flex-col items-center gap-1.5 cursor-pointer"
           >
-            <span className="flex size-11 items-center justify-center rounded-full bg-surface-sunken text-fg">
+            <span className="flex size-11 items-center justify-center rounded-full bg-surface-sunken text-fg transition-all duration-150 group-hover:scale-110 group-hover:shadow-md group-active:scale-100">
               <Mail className="size-[18px]" />
             </span>
             <span className="text-[11px] text-fg-secondary">Email</span>
           </button>
           <button
             onClick={() => openExternal(`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`)}
-            className="flex shrink-0 flex-col items-center gap-1.5 cursor-pointer"
+            className="group flex shrink-0 flex-col items-center gap-1.5 cursor-pointer"
           >
-            <span className="flex size-11 items-center justify-center rounded-full bg-[#1877F2] text-white text-sm font-bold">f</span>
+            <span className="flex size-11 items-center justify-center rounded-full bg-[#1877F2] text-white text-sm font-bold transition-all duration-150 group-hover:scale-110 group-hover:shadow-md group-active:scale-100">f</span>
             <span className="text-[11px] text-fg-secondary">Facebook</span>
           </button>
           <button
             onClick={() => openExternal(`https://twitter.com/intent/tweet?text=${encodeURIComponent(shareSnippet)}&url=${encodeURIComponent(shareUrl)}`)}
-            className="flex shrink-0 flex-col items-center gap-1.5 cursor-pointer"
+            className="group flex shrink-0 flex-col items-center gap-1.5 cursor-pointer"
           >
-            <span className="flex size-11 items-center justify-center rounded-full bg-black text-white text-sm font-bold">X</span>
+            <span className="flex size-11 items-center justify-center rounded-full bg-black text-white text-sm font-bold transition-all duration-150 group-hover:scale-110 group-hover:shadow-md group-active:scale-100">X</span>
             <span className="text-[11px] text-fg-secondary">X</span>
           </button>
         </div>

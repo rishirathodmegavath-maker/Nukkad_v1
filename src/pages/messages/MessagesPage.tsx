@@ -52,7 +52,7 @@ function ConversationListItem({ conversation, active }: { conversation: Conversa
   const navigate = useNavigate()
   const otherUserId = conversation.participantIds.find((p) => p !== getCurrentUserId())
   const { data: user } = useUser(otherUserId)
-  if (!user) return <Skeleton className="h-16 w-full rounded-lg" />
+  if (!user) return <Skeleton className="h-16 w-full rounded-xl" />
 
   const lastMessage = conversation.lastMessage
   const unread = lastMessage && lastMessage.senderId !== getCurrentUserId() && !lastMessage.isRead
@@ -61,8 +61,10 @@ function ConversationListItem({ conversation, active }: { conversation: Conversa
     <button
       onClick={() => navigate(`/messages/${conversation.id}`)}
       className={cn(
-        'flex items-center gap-3 w-full text-left px-3.5 py-3 rounded-lg cursor-pointer transition-colors',
-        active ? 'bg-surface-selected' : 'hover:bg-surface-hover',
+        'flex items-center gap-3 w-full text-left px-3.5 py-3 rounded-xl border cursor-pointer transition-all',
+        active
+          ? 'bg-surface-selected border-border-strong shadow-2xs'
+          : 'border-border/70 hover:border-border-strong hover:bg-surface-hover hover:shadow-2xs',
       )}
     >
       <Avatar src={user.avatarUrl} name={user.name} size="md" />
@@ -635,7 +637,7 @@ export default function MessagesPage() {
   }, [conversationId, navigate, refetch])
 
   return (
-    <div className="h-[calc(100vh-8rem)] flex rounded-2xl border border-border/80 bg-surface shadow-xs overflow-hidden">
+    <div className="h-[calc(100dvh-8rem)] flex rounded-2xl border border-border/80 bg-surface shadow-xs overflow-hidden">
       {/* Left conversation list */}
       <div
         className={cn(
@@ -653,7 +655,7 @@ export default function MessagesPage() {
             <Skeleton className="h-16 w-full rounded-xl" />
           </div>
         ) : conversations && conversations.length > 0 ? (
-          <div className="flex flex-col gap-1">
+          <div className="flex flex-col gap-2">
             {conversations.map((c) => (
               <ConversationListItem key={c.id} conversation={c} active={c.id === conversationId} />
             ))}
