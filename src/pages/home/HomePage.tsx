@@ -13,6 +13,7 @@ import {
   Plus,
   Compass,
   ChevronRight,
+  Rss,
 } from 'lucide-react'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { listIdeas } from '@/services/ideas.service'
@@ -20,9 +21,11 @@ import { listStartups } from '@/services/startups.service'
 import { listOpportunities, listRecommendedOpportunities } from '@/services/opportunities.service'
 import { listEvents } from '@/services/events.service'
 import { getChapter } from '@/services/chapters.service'
+import { listFeed } from '@/services/feed.service'
 import { IdeaCard } from '@/components/domain/IdeaCard'
 import { StartupCard } from '@/components/domain/StartupCard'
 import { EventCard } from '@/components/domain/EventCard'
+import { PostCard } from '@/components/domain/PostCard'
 import { SuggestedForYou } from '@/components/domain/SuggestedForYou'
 import { MatchReasons } from '@/components/domain/MatchReasons'
 import { Card } from '@/components/ui/Card'
@@ -119,6 +122,7 @@ export default function HomePage() {
     enabled: !recommendedOppsQuery.data || recommendedOppsQuery.data.length === 0,
   })
   const eventsQuery = useQuery({ queryKey: ['events', 'upcoming'], queryFn: () => listEvents({ upcoming: true }) })
+  const feedQuery = useQuery({ queryKey: ['feed', 'home'], queryFn: () => listFeed() })
   const chapterQuery = useQuery({
     queryKey: ['chapter', currentUser?.chapterId],
     queryFn: () => getChapter(currentUser!.chapterId!),
@@ -164,6 +168,7 @@ export default function HomePage() {
 
   const firstName = currentUser?.name?.split(' ')[0] || 'Builder'
   const upcomingEvents = eventsQuery.data?.slice(0, 2) || []
+  const recentPosts = feedQuery.data?.slice(0, 3) || []
 
   return (
     <div className="flex flex-col gap-7 max-w-7xl mx-auto">
@@ -380,6 +385,46 @@ export default function HomePage() {
                 <p className="text-xs text-fg-muted mt-1 max-w-sm mx-auto">
                   New roles for co-founders, founding engineers, and interns will appear here.
                 </p>
+              </Card>
+            )}
+          </section>
+
+          {/* ------------------------------------------------------------ */}
+          {/* Section C: Community Feed preview                            */}
+          {/* ------------------------------------------------------------ */}
+          <section className="flex flex-col gap-3.5">
+            <div className="flex items-center justify-between pb-1 border-b border-border/60">
+              <h2 className="text-base font-bold text-fg flex items-center gap-2">
+                <Rss className="size-4 text-fg-muted" />
+                <span>Community feed</span>
+              </h2>
+              <Link
+                to="/feed"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-fg hover:underline"
+              >
+                <span>View full feed</span>
+                <ArrowRight className="size-3.5" />
+              </Link>
+            </div>
+
+            {feedQuery.isLoading ? (
+              <CardSkeletonGrid count={2} />
+            ) : recentPosts.length > 0 ? (
+              <div className="flex flex-col gap-4">
+                {recentPosts.map((post) => (
+                  <PostCard key={post.id} post={post} />
+                ))}
+              </div>
+            ) : (
+              <Card className="text-center py-8">
+                <Rss className="size-8 text-fg-muted mx-auto mb-2" />
+                <p className="text-sm font-semibold text-fg">Your feed is waiting for your voice</p>
+                <p className="text-xs text-fg-muted mt-1 max-w-sm mx-auto">
+                  Be the first to share an update, showcase a project, or ask a question.
+                </p>
+                <Link to="/feed" className="inline-block mt-4">
+                  <Button size="sm">Go to feed</Button>
+                </Link>
               </Card>
             )}
           </section>
