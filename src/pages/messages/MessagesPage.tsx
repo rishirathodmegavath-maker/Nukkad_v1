@@ -533,7 +533,7 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                             </div>
                             {!selectMode && (
                               <DropdownMenu
-                                align={isOwn ? 'left' : 'right'}
+                                align={isOwn ? 'right' : 'left'}
                                 trigger={
                                   <button
                                     type="button"
@@ -562,7 +562,7 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                             </div>
                             {!selectMode && (
                               <DropdownMenu
-                                align={isOwn ? 'left' : 'right'}
+                                align={isOwn ? 'right' : 'left'}
                                 trigger={
                                   <button
                                     type="button"
