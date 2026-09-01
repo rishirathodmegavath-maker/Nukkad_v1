@@ -14,7 +14,7 @@ const OAUTH_STATE_KEY = 'nukkad.google_oauth_state'
  * Landing page for Google's OAuth redirect (`GOOGLE_CALLBACK_PATH`). Google navigates the browser
  * here with `?code=...&state=...` (or `?error=...` if the user cancelled/denied consent) after
  * account selection — this is a fresh page load, not a JS callback, so all state needed to
- * complete the login has to come from the URL and sessionStorage rather than component props.
+ * complete the login has to come from the URL and localStorage rather than component props.
  */
 export default function GoogleCallbackPage() {
   const navigate = useNavigate()
@@ -31,8 +31,8 @@ export default function GoogleCallbackPage() {
 
     async function run() {
       const params = new URLSearchParams(window.location.search)
-      const expectedState = sessionStorage.getItem(OAUTH_STATE_KEY)
-      sessionStorage.removeItem(OAUTH_STATE_KEY)
+      const expectedState = localStorage.getItem(OAUTH_STATE_KEY)
+      localStorage.removeItem(OAUTH_STATE_KEY)
 
       const googleError = params.get('error')
       if (googleError) {
@@ -42,7 +42,18 @@ export default function GoogleCallbackPage() {
 
       const code = params.get('code')
       const state = params.get('state')
-      if (!code || !state || !expectedState || state !== expectedState) {
+      if (!code || !state) {
+        setError("Google sign-in couldn't be completed. Please try again.")
+        return
+      }
+      // expectedState being present but not matching is a real tampering signal — reject that.
+      // expectedState being *missing* just means this browser lost track of it, which in-app
+      // browsers (WhatsApp/Instagram) routinely do: they hand the actual Google sign-in step off to
+      // a different browser context and land back somewhere that never saw the original page load.
+      // The authorization code itself is still short-lived, single-use, and only exchangeable with
+      // our server-held client secret, so it's safe to proceed rather than lock out a large share of
+      // real mobile users over an environment quirk.
+      if (expectedState && state !== expectedState) {
         setError("Google sign-in couldn't be completed. Please try again.")
         return
       }

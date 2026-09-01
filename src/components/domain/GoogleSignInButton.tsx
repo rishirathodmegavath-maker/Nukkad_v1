@@ -64,9 +64,11 @@ export function GoogleSignInButton({ mode = 'login', onSuccess, onError }: Googl
     }
     setIsRedirecting(true)
     // Round-tripped back to us via the redirect's `state` query param and checked in
-    // GoogleCallbackPage — CSRF protection for the OAuth exchange.
+    // GoogleCallbackPage — CSRF protection for the OAuth exchange. localStorage (not sessionStorage)
+    // because in-app browsers (WhatsApp/Instagram) commonly hand the Google step off to a different
+    // browser context that doesn't share the originating tab's session storage.
     const state = crypto.randomUUID()
-    sessionStorage.setItem(OAUTH_STATE_KEY, state)
+    localStorage.setItem(OAUTH_STATE_KEY, state)
     const client = window.google.accounts.oauth2.initCodeClient({
       client_id: CLIENT_ID,
       scope: 'openid email profile',
