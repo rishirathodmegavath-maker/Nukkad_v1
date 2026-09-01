@@ -176,13 +176,26 @@ function DetailsPanel({
   })
 
   return (
-    <div className="hidden lg:flex w-[280px] shrink-0 border-l border-border-subtle flex-col overflow-y-auto">
-      <div className="flex items-center justify-between px-4 py-3.5 border-b border-border-subtle">
-        <p className="font-semibold text-fg text-sm">Details</p>
-        <button onClick={onClose} className="text-fg-muted hover:text-fg cursor-pointer">
-          <X className="size-4" />
-        </button>
-      </div>
+    <>
+      {/* Mobile / Tablet Backdrop */}
+      <div
+        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs lg:hidden animate-in fade-in duration-200"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+
+      {/* Details Container: Slide-over drawer on mobile/tablet, docked right column on desktop (lg:static) */}
+      <div className="fixed inset-y-0 right-0 z-50 w-[300px] max-w-[85vw] bg-surface border-l border-border/80 shadow-2xl flex flex-col overflow-y-auto lg:static lg:z-auto lg:w-[280px] lg:shadow-none lg:border-border-subtle animate-in slide-in-from-right duration-200">
+        <div className="flex items-center justify-between px-4 py-3.5 border-b border-border-subtle">
+          <p className="font-semibold text-fg text-sm">Details</p>
+          <button
+            onClick={onClose}
+            className="flex size-8 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
+            aria-label="Close details"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
 
       <button
         onClick={() => muteMutation.mutate()}
@@ -286,7 +299,8 @@ function DetailsPanel({
         conversationId={conversation.id}
       />
     </div>
-  )
+  </>
+)
 }
 
 function ChatPanel({ conversationId }: { conversationId: string }) {
