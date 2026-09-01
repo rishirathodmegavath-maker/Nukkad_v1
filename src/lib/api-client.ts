@@ -42,17 +42,27 @@ export interface Page<T> {
   totalPages: number
 }
 
+/** Thrown when the refresh *request itself* couldn't be made (offline, dropped signal, DNS hiccup)
+ * — distinct from the server actually rejecting the refresh token, so callers don't destroy an
+ * otherwise-valid session over a transient connectivity blip. */
+class RefreshNetworkError extends Error {}
+
 /** In-flight refresh is de-duplicated so N parallel 401s trigger exactly one refresh call. */
 let refreshPromise: Promise<Session> | null = null
 
 async function refreshAccessToken(currentRefreshToken: string): Promise<Session> {
   if (!refreshPromise) {
     refreshPromise = (async () => {
-      const response = await fetch(`${BASE_URL}/auth/refresh`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ refreshToken: currentRefreshToken }),
-      })
+      let response: Response
+      try {
+        response = await fetch(`${BASE_URL}/auth/refresh`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ refreshToken: currentRefreshToken }),
+        })
+      } catch {
+        throw new RefreshNetworkError('Network error while refreshing session')
+      }
       const body = await response.json().catch(() => null)
       if (!response.ok || !body?.success) {
         throw new ApiError(body?.message ?? 'Session expired', response.status, body?.errorCode)
@@ -108,7 +118,10 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
   ) {
     try {
       await refreshAccessToken(session.refreshToken)
-    } catch {
+    } catch (err) {
+      if (err instanceof RefreshNetworkError) {
+        throw new ApiError('Network error — is the backend running?', 0)
+      }
       clearSession()
       if (typeof window !== 'undefined') window.location.assign('/login')
       throw new ApiError('Session expired — please log in again', 401, 'UNAUTHORIZED')
@@ -168,7 +181,10 @@ export async function uploadFile<T>(
   if (response.status === 401 && session?.refreshToken) {
     try {
       await refreshAccessToken(session.refreshToken)
-    } catch {
+    } catch (err) {
+      if (err instanceof RefreshNetworkError) {
+        throw new ApiError('Network error — is the backend running?', 0)
+      }
       clearSession()
       if (typeof window !== 'undefined') window.location.assign('/login')
       throw new ApiError('Session expired — please log in again', 401, 'UNAUTHORIZED')
