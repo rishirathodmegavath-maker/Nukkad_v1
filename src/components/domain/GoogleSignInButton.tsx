@@ -1,7 +1,9 @@
-import { useState } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef } from 'react'
 import { Button } from '@/components/ui/Button'
 import { toast } from '@/store/toast.store'
 import { googleRedirectUri } from '@/lib/google-auth'
+import { linkGoogleAccount } from '@/services/auth.service'
+import { ApiError } from '@/lib/api-client'
 
 const CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
 const OAUTH_STATE_KEY = 'nukkad.google_oauth_state'
@@ -17,19 +19,45 @@ function GoogleLogo() {
   )
 }
 
-/**
- * Uses Google's own OAuth 2.0 authorization-code redirect flow (`google.accounts.oauth2.initCodeClient`
- * with `ux_mode: 'redirect'`) — a real top-level browser navigation to Google and back, with no
- * popup, iframe, or postMessage handoff involved. That handoff was the actual point of failure on
- * mobile: Google's credential-callback mechanism depends on delivering a message back into this
- * page's JS, which is subject to a wide range of undocumented mobile browser/FedCM restrictions we
- * have no visibility into. A full-page redirect is the same mechanism OAuth has used since 2007 and
- * behaves identically across every browser.
- */
-export function GoogleSignInButton() {
-  const [isRedirecting, setIsRedirecting] = useState(false)
+interface GoogleSignInButtonProps {
+  /** 'login' authenticates an existing linked account via a full-page redirect (see below).
+   *  'link' attaches Google to the currently logged-in account from Settings, in place, via a
+   *  popup ID-token credential — it never signs the user in or out. */
+  mode?: 'login' | 'link'
+  onSuccess?: () => void
+  onError?: (error: ApiError | Error) => void
+}
 
-  function handleClick() {
+/**
+ * mode="login" uses Google's own OAuth 2.0 authorization-code redirect flow
+ * (`google.accounts.oauth2.initCodeClient` with `ux_mode: 'redirect'`) — a real top-level browser
+ * navigation to Google and back, with no popup, iframe, or postMessage handoff involved. That
+ * handoff was the actual point of failure on mobile: Google's credential-callback mechanism
+ * depends on delivering a message back into this page's JS, which is subject to a wide range of
+ * undocumented mobile browser/FedCM restrictions we have no visibility into. A full-page redirect
+ * is the same mechanism OAuth has used since 2007 and behaves identically across every browser.
+ * Because the page navigates away, `onSuccess`/`onError` are not used in this mode — the result is
+ * handled by GoogleCallbackPage after Google redirects back.
+ *
+ * mode="link" happens from an already-authenticated Settings page, a lower-stakes context where
+ * the simpler Google Identity Services popup/credential flow is acceptable — it renders Google's
+ * own button and calls back with an ID token, which is exchanged via `onSuccess`/`onError`.
+ */
+export function GoogleSignInButton({ mode = 'login', onSuccess, onError }: GoogleSignInButtonProps) {
+  const [isRedirecting, setIsRedirecting] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  // Settings passes new onSuccess/onError function instances on every render (unmemoized) —
+  // reading the latest via refs instead of depending on them directly keeps the init effect below
+  // from tearing down and re-registering the GIS button on every render.
+  const onSuccessRef = useRef(onSuccess)
+  const onErrorRef = useRef(onError)
+  useLayoutEffect(() => {
+    onSuccessRef.current = onSuccess
+    onErrorRef.current = onError
+  })
+
+  function handleLoginClick() {
     if (!CLIENT_ID || !window.google) {
       toast.error("Google sign-in couldn't be completed. Please try again.")
       return
@@ -49,7 +77,56 @@ export function GoogleSignInButton() {
     client.requestCode()
   }
 
+  useEffect(() => {
+    if (mode !== 'link' || !CLIENT_ID || !containerRef.current) return
+
+    let cancelled = false
+    function render() {
+      if (cancelled || !window.google || !containerRef.current) return
+      window.google.accounts.id.initialize({
+        client_id: CLIENT_ID,
+        callback: async (response) => {
+          try {
+            await linkGoogleAccount(response.credential)
+            onSuccessRef.current?.()
+          } catch (err) {
+            if (onErrorRef.current && err instanceof Error) {
+              onErrorRef.current(err)
+            } else {
+              toast.error(err instanceof Error ? err.message : 'Google sign-in failed')
+            }
+          }
+        },
+      })
+      window.google.accounts.id.renderButton(containerRef.current, {
+        theme: 'outline',
+        size: 'large',
+        width: 320,
+        text: 'continue_with',
+      })
+    }
+
+    if (window.google) {
+      render()
+    } else {
+      const interval = setInterval(() => {
+        if (window.google) {
+          clearInterval(interval)
+          render()
+        }
+      }, 100)
+      return () => {
+        cancelled = true
+        clearInterval(interval)
+      }
+    }
+  }, [mode])
+
   if (!CLIENT_ID) return null
+
+  if (mode === 'link') {
+    return <div ref={containerRef} />
+  }
 
   return (
     <div className="flex flex-col items-center gap-3 w-full">
@@ -65,7 +142,7 @@ export function GoogleSignInButton() {
         className="w-full"
         isLoading={isRedirecting}
         leftIcon={isRedirecting ? undefined : <GoogleLogo />}
-        onClick={handleClick}
+        onClick={handleLoginClick}
       >
         Continue with Google
       </Button>

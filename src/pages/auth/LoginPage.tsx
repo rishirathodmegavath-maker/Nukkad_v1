@@ -7,6 +7,13 @@ import { Button } from '@/components/ui/Button'
 import { GoogleSignInButton } from '@/components/domain/GoogleSignInButton'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from '@/store/toast.store'
+import { resendVerificationEmail } from '@/services/auth.service'
+import { ApiError } from '@/lib/api-client'
+
+export interface GoogleLoginNotice {
+  message: string
+  action?: 'signup'
+}
 
 export default function LoginPage() {
   const navigate = useNavigate()
@@ -16,6 +23,11 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
+  const [showResend, setShowResend] = useState(false)
+  const [isResending, setIsResending] = useState(false)
+  const [googleNotice] = useState<GoogleLoginNotice | null>(
+    () => (location.state as { googleNotice?: GoogleLoginNotice } | null)?.googleNotice ?? null,
+  )
 
   function goHome() {
     const from = (location.state as { from?: Location })?.from?.pathname ?? '/'
@@ -25,15 +37,33 @@ export default function LoginPage() {
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
     setError('')
+    setShowResend(false)
     setIsLoading(true)
     try {
       await login({ email, password })
       toast.success('Welcome back!')
       goHome()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.')
+      if (err instanceof ApiError && err.errorCode === 'EMAIL_NOT_VERIFIED') {
+        setError('Please verify your email before signing in.')
+        setShowResend(true)
+      } else {
+        setError(err instanceof Error ? err.message : 'Something went wrong.')
+      }
     } finally {
       setIsLoading(false)
+    }
+  }
+
+  async function handleResend() {
+    setIsResending(true)
+    try {
+      await resendVerificationEmail(email)
+      toast.success('Verification email sent again.')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not resend verification email.')
+    } finally {
+      setIsResending(false)
     }
   }
 
@@ -75,9 +105,24 @@ export default function LoginPage() {
             Forgot password?
           </Link>
         </div>
+        {showResend && (
+          <Button type="button" variant="secondary" size="sm" isLoading={isResending} onClick={handleResend}>
+            Resend verification email
+          </Button>
+        )}
         <Button type="submit" size="lg" isLoading={isLoading} className="w-full mt-2">
           Log in
         </Button>
+        {googleNotice && (
+          <div className="rounded-lg border border-border/80 bg-surface-sunken px-3 py-2.5 text-xs text-fg-secondary">
+            <p>{googleNotice.message}</p>
+            {googleNotice.action === 'signup' && (
+              <Link to="/signup" className="inline-block mt-1.5">
+                <Button size="sm">Create Nukkad account</Button>
+              </Link>
+            )}
+          </div>
+        )}
         <GoogleSignInButton />
       </form>
     </AuthLayout>

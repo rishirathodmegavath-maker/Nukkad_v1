@@ -6,6 +6,7 @@ import LoginPage from '@/pages/auth/LoginPage'
 import SignupPage from '@/pages/auth/SignupPage'
 import ForgotPasswordPage from '@/pages/auth/ForgotPasswordPage'
 import GoogleCallbackPage from '@/pages/auth/GoogleCallbackPage'
+import VerifyEmailPage from '@/pages/auth/VerifyEmailPage'
 import { GOOGLE_CALLBACK_PATH } from '@/lib/google-auth'
 import OnboardingPage from '@/pages/onboarding/OnboardingPage'
 
@@ -48,6 +49,7 @@ export function AppRoutes() {
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
       </Route>
 
       {/* Unguarded: this is the landing page for Google's OAuth redirect, reached mid-login

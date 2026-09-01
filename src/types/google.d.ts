@@ -7,6 +7,10 @@ interface GoogleCodeClient {
   requestCode: () => void
 }
 
+interface GoogleCredentialResponse {
+  credential: string
+}
+
 interface Window {
   google?: {
     accounts: {
@@ -18,6 +22,16 @@ interface Window {
           redirect_uri: string
           state?: string
         }) => GoogleCodeClient
+      }
+      id: {
+        initialize: (config: {
+          client_id: string
+          callback: (response: GoogleCredentialResponse) => void
+        }) => void
+        renderButton: (
+          parent: HTMLElement,
+          options: { theme?: string; size?: string; width?: number; text?: string },
+        ) => void
       }
     }
   }

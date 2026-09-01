@@ -9,7 +9,11 @@ interface AuthResponseDto {
   accessToken: string
   refreshToken: string
   expiresIn: number
-  isNewUser?: boolean
+}
+
+interface RegisterResponseDto {
+  email: string
+  message: string
 }
 
 function toSession(dto: AuthResponseDto): Session {
@@ -28,27 +32,40 @@ export async function login(credentials: LoginCredentials): Promise<Session> {
   return session
 }
 
-export async function signup(payload: SignupPayload): Promise<Session> {
-  const dto = await apiClient.post<AuthResponseDto>('/auth/register', payload)
+/** Register no longer logs the user in — the account starts unverified with no session. */
+export async function signup(payload: SignupPayload): Promise<RegisterResponseDto> {
+  return apiClient.post<RegisterResponseDto>('/auth/register', payload)
+}
+
+export async function verifyEmail(token: string): Promise<void> {
+  await apiClient.post('/auth/verify-email', { token })
+}
+
+export async function resendVerificationEmail(email: string): Promise<void> {
+  await apiClient.post('/auth/resend-verification', { email })
+}
+
+/** Google can only authenticate an existing, already-linked Nukkad account — never creates one. */
+export async function loginWithGoogle(idToken: string): Promise<Session> {
+  const dto = await apiClient.post<AuthResponseDto>('/auth/google', { idToken })
   const session = toSession(dto)
   persistSession(session)
   return session
 }
 
-export async function loginWithGoogle(idToken: string): Promise<{ session: Session; isNewUser: boolean }> {
-  const dto = await apiClient.post<AuthResponseDto>('/auth/google', { idToken })
-  const session = toSession(dto)
-  persistSession(session)
-  return { session, isNewUser: !!dto.isNewUser }
-}
-
 /** Redirect-flow counterpart: exchanges the OAuth authorization code Google handed back after
- * the full-page redirect for a Nukkad session, via the backend (which holds the client secret). */
-export async function exchangeGoogleCode(code: string, redirectUri: string): Promise<{ session: Session; isNewUser: boolean }> {
+ * the full-page redirect for a Nukkad session, via the backend (which holds the client secret).
+ * Subject to the same "must already be linked" policy as loginWithGoogle. */
+export async function exchangeGoogleCode(code: string, redirectUri: string): Promise<Session> {
   const dto = await apiClient.post<AuthResponseDto>('/auth/google/code', { code, redirectUri })
   const session = toSession(dto)
   persistSession(session)
-  return { session, isNewUser: !!dto.isNewUser }
+  return session
+}
+
+/** Links Google to the CURRENTLY authenticated account (called from Settings), never at login/signup. */
+export async function linkGoogleAccount(idToken: string): Promise<void> {
+  await apiClient.post('/auth/google/link', { idToken })
 }
 
 export async function requestPasswordReset(email: string): Promise<{ sent: true }> {
@@ -75,11 +92,6 @@ export async function revokeSession(sessionId: string): Promise<void> {
 
 export async function logoutAllOtherSessions(): Promise<void> {
   await apiClient.post('/auth/sessions/logout-all', undefined, currentRefreshTokenHeader())
-}
-
-/** No backend endpoint yet (OTP flow was deprioritized) — kept as a stub so the UI still compiles. */
-export async function verifyOtp(_email: string, code: string): Promise<{ verified: boolean }> {
-  return { verified: code.length === 6 }
 }
 
 export async function logout(): Promise<void> {

@@ -218,4 +218,5 @@ export interface User {
   isOnline?: boolean
   createdAt: string
   roles: string[]
+  googleLinked: boolean
 }

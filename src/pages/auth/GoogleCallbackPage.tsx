@@ -5,6 +5,8 @@ import { AuthLayout } from './AuthLayout'
 import { googleRedirectUri } from '@/lib/google-auth'
 import { useAuthStore } from '@/store/auth.store'
 import { toast } from '@/store/toast.store'
+import { ApiError } from '@/lib/api-client'
+import type { GoogleLoginNotice } from './LoginPage'
 
 const OAUTH_STATE_KEY = 'nukkad.google_oauth_state'
 
@@ -18,6 +20,7 @@ export default function GoogleCallbackPage() {
   const navigate = useNavigate()
   const completeGoogleLogin = useAuthStore((s) => s.completeGoogleLogin)
   const [error, setError] = useState<string | null>(null)
+  const [googleNotice, setGoogleNotice] = useState<GoogleLoginNotice | null>(null)
   const ranRef = useRef(false)
 
   useEffect(() => {
@@ -45,10 +48,19 @@ export default function GoogleCallbackPage() {
       }
 
       try {
-        const { isNewUser } = await completeGoogleLogin(code, googleRedirectUri())
-        navigate(isNewUser ? '/onboarding' : '/', { replace: true })
+        await completeGoogleLogin(code, googleRedirectUri())
+        navigate('/', { replace: true })
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Google sign-in couldn't be completed. Please try again.")
+        if (err instanceof ApiError && err.errorCode === 'GOOGLE_NO_ACCOUNT') {
+          setGoogleNotice({ message: "Your Google account isn't connected to a Nukkad account yet.", action: 'signup' })
+        } else if (err instanceof ApiError && err.errorCode === 'GOOGLE_ACCOUNT_NOT_LINKED') {
+          setGoogleNotice({
+            message:
+              "This Nukkad account isn't connected to Google yet. Sign in with your email and password, then connect Google from Security settings.",
+          })
+        } else {
+          setError(err instanceof Error ? err.message : "Google sign-in couldn't be completed. Please try again.")
+        }
       }
     }
 
@@ -61,7 +73,12 @@ export default function GoogleCallbackPage() {
     navigate('/login', { replace: true })
   }, [error, navigate])
 
-  if (error) return null
+  useEffect(() => {
+    if (!googleNotice) return
+    navigate('/login', { replace: true, state: { googleNotice } })
+  }, [googleNotice, navigate])
+
+  if (error || googleNotice) return null
 
   return (
     <AuthLayout title="Signing you in" subtitle="Just a moment while we finish connecting your Google account.">

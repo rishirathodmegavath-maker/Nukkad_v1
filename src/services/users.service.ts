@@ -138,6 +138,7 @@ export interface UserDto {
   createdAt: string
   connectionStatus: ConnectionStatus | null
   isFollowing: boolean | null
+  googleLinked: boolean
   experiences: ExperienceDto[]
   education: EducationDto[]
   achievements: AchievementDto[]
@@ -285,6 +286,7 @@ export function mapUser(dto: UserDto): User {
     isOnline: dto.isOnline,
     createdAt: dto.createdAt,
     roles: dto.roles ?? [],
+    googleLinked: dto.googleLinked,
   }
 }
 
