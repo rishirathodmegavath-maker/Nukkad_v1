@@ -1,5 +1,5 @@
-import type { InputHTMLAttributes, ReactNode, TextareaHTMLAttributes, SelectHTMLAttributes } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { useState, type InputHTMLAttributes, type ReactNode, type TextareaHTMLAttributes, type SelectHTMLAttributes } from 'react'
+import { ChevronDown, Eye, EyeOff } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface FieldWrapProps {
@@ -61,6 +61,29 @@ export function Input({ label, hint, error, required, leftIcon, rightIcon, class
         {rightIcon && <span className="absolute right-3.5 text-fg-muted">{rightIcon}</span>}
       </span>
     </FieldWrap>
+  )
+}
+
+type PasswordInputProps = Omit<InputProps, 'type' | 'rightIcon'>
+
+export function PasswordInput({ ...props }: PasswordInputProps) {
+  const [visible, setVisible] = useState(false)
+  return (
+    <Input
+      {...props}
+      type={visible ? 'text' : 'password'}
+      rightIcon={
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => setVisible((v) => !v)}
+          className="pointer-events-auto text-fg-muted hover:text-fg transition-colors"
+          aria-label={visible ? 'Hide password' : 'Show password'}
+        >
+          {visible ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+        </button>
+      }
+    />
   )
 }
 

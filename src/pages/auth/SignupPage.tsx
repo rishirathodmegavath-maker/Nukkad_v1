@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import { Mail, Lock, User, CheckCircle2 } from 'lucide-react'
 import { AuthLayout } from './AuthLayout'
-import { Input } from '@/components/ui/Input'
+import { Input, PasswordInput } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { useAuthStore } from '@/store/auth.store'
 import { resendVerificationEmail } from '@/services/auth.service'
@@ -138,9 +138,8 @@ export default function SignupPage() {
           placeholder="you@example.com"
         />
         <div className="flex flex-col gap-1.5">
-          <Input
+          <PasswordInput
             label="Password"
-            type="password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
@@ -149,9 +148,8 @@ export default function SignupPage() {
           />
           <p className="text-xs text-fg-muted">{PASSWORD_REQUIREMENTS}</p>
         </div>
-        <Input
+        <PasswordInput
           label="Confirm password"
-          type="password"
           required
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}

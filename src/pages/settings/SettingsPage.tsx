@@ -30,7 +30,7 @@ import type { AccountPrivacySettings, ConnectPermission, MessagePermission, Prof
 import { PageHeader } from '@/components/domain/PageHeader'
 import { Card } from '@/components/ui/Card'
 import { Avatar } from '@/components/ui/Avatar'
-import { Input, Textarea, Select } from '@/components/ui/Input'
+import { Input, PasswordInput, Textarea, Select } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { Tabs } from '@/components/ui/Tabs'
 import { UploadButton, UploadSpinnerOverlay, type UploadPhase } from '@/components/ui/UploadButton'
@@ -213,25 +213,22 @@ function ChangePasswordSection() {
       <h2 className="font-semibold text-fg mb-1">Change password</h2>
       <p className="text-sm text-fg-muted mb-3">You'll be logged out of all devices after changing your password.</p>
       <form onSubmit={handleSubmit} className="flex flex-col gap-4">
-        <Input
+        <PasswordInput
           label="Current password"
-          type="password"
           value={currentPassword}
           onChange={(e) => setCurrentPassword(e.target.value)}
           autoComplete="current-password"
           required
         />
-        <Input
+        <PasswordInput
           label="New password"
-          type="password"
           value={newPassword}
           onChange={(e) => setNewPassword(e.target.value)}
           autoComplete="new-password"
           required
         />
-        <Input
+        <PasswordInput
           label="Confirm new password"
-          type="password"
           value={confirmPassword}
           onChange={(e) => setConfirmPassword(e.target.value)}
           autoComplete="new-password"

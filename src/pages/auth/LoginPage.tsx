@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { Mail, Lock } from 'lucide-react'
 import { AuthLayout } from './AuthLayout'
-import { Input } from '@/components/ui/Input'
+import { Input, PasswordInput } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { GoogleSignInButton } from '@/components/domain/GoogleSignInButton'
 import { useAuthStore } from '@/store/auth.store'
@@ -91,9 +91,8 @@ export default function LoginPage() {
           placeholder="you@example.com"
         />
         <div className="flex flex-col gap-1.5">
-          <Input
+          <PasswordInput
             label="Password"
-            type="password"
             required
             value={password}
             onChange={(e) => setPassword(e.target.value)}
