@@ -311,52 +311,60 @@ export function PostCard({ post }: { post: Post }) {
           )}
           <p className="text-[11px] font-medium text-fg-muted mt-0.5">{formatRelativeTime(post.createdAt)}</p>
         </div>
-        {isOwnPost && (
-          <DropdownMenu
-            trigger={
-              <button
-                type="button"
-                className="flex size-8 items-center justify-center rounded-xl text-fg-muted hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
-                aria-label="Post options"
+        <DropdownMenu
+          trigger={
+            <button
+              type="button"
+              className="flex size-8 items-center justify-center rounded-xl text-fg-muted hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
+              aria-label="Post options"
+            >
+              <MoreHorizontal className="size-4" />
+            </button>
+          }
+        >
+          {isOwnPost ? (
+            <>
+              <DropdownItem danger icon={<Trash2 className="size-4" />} onClick={() => setShowDeleteModal(true)}>
+                Delete post
+              </DropdownItem>
+              <DropdownDivider />
+              <DropdownItem
+                icon={<Pencil className="size-4" />}
+                onClick={() => {
+                  setEditContent(post.content)
+                  setShowEditModal(true)
+                }}
               >
-                <MoreHorizontal className="size-4" />
-              </button>
-            }
-          >
-            <DropdownItem danger icon={<Trash2 className="size-4" />} onClick={() => setShowDeleteModal(true)}>
-              Delete
-            </DropdownItem>
-            <DropdownDivider />
-            <DropdownItem
-              icon={<Pencil className="size-4" />}
-              onClick={() => {
-                setEditContent(post.content)
-                setShowEditModal(true)
-              }}
-            >
-              Edit
-            </DropdownItem>
-            <DropdownItem
-              icon={post.hideLikeCount ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
-              onClick={() => hideLikeCountMutation.mutate()}
-            >
-              {post.hideLikeCount ? 'Show like count to others' : 'Hide like count to others'}
-            </DropdownItem>
-            <DropdownItem
-              icon={post.commentsDisabled ? <MessageCircle className="size-4" /> : <MessageCircleOff className="size-4" />}
-              onClick={() => commentsDisabledMutation.mutate()}
-            >
-              {post.commentsDisabled ? 'Turn on commenting' : 'Turn off commenting'}
-            </DropdownItem>
-            <DropdownDivider />
-            <DropdownItem icon={<ExternalLink className="size-4" />} onClick={() => navigate(`/feed/${post.id}`)}>
-              Go to post
-            </DropdownItem>
-            <DropdownItem icon={<Info className="size-4" />} onClick={() => navigate(`/people/${post.authorId}`)}>
-              About this account
-            </DropdownItem>
-          </DropdownMenu>
-        )}
+                Edit
+              </DropdownItem>
+              <DropdownItem
+                icon={post.hideLikeCount ? <Eye className="size-4" /> : <EyeOff className="size-4" />}
+                onClick={() => hideLikeCountMutation.mutate()}
+              >
+                {post.hideLikeCount ? 'Show like count to others' : 'Hide like count to others'}
+              </DropdownItem>
+              <DropdownItem
+                icon={post.commentsDisabled ? <MessageCircle className="size-4" /> : <MessageCircleOff className="size-4" />}
+                onClick={() => commentsDisabledMutation.mutate()}
+              >
+                {post.commentsDisabled ? 'Turn on commenting' : 'Turn off commenting'}
+              </DropdownItem>
+              <DropdownDivider />
+              <DropdownItem icon={<ExternalLink className="size-4" />} onClick={() => navigate(`/feed/${post.id}`)}>
+                Go to post
+              </DropdownItem>
+            </>
+          ) : (
+            <>
+              <DropdownItem icon={<ExternalLink className="size-4" />} onClick={() => navigate(`/feed/${post.id}`)}>
+                Go to post
+              </DropdownItem>
+              <DropdownItem icon={<Info className="size-4" />} onClick={() => navigate(`/people/${post.authorId}`)}>
+                About this account
+              </DropdownItem>
+            </>
+          )}
+        </DropdownMenu>
       </div>
 
       <div className="px-4 sm:px-5 pb-3.5 flex flex-col gap-3">

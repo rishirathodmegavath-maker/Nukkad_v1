@@ -251,44 +251,62 @@ function DetailsPanel({
       </button>
 
       <Modal open={showBlockModal} onClose={() => setShowBlockModal(false)} size="sm">
-        <div className="flex flex-col items-center text-center gap-2 pb-4">
-          <p className="text-lg font-semibold text-fg">Block {otherUser.name}?</p>
-          <p className="text-sm text-fg-muted">
-            They won't be able to message you or find your profile. They won't be notified that you blocked them.
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-danger-50 dark:bg-danger-950/40 text-danger-600 dark:text-danger-400 border border-danger-200/60 dark:border-danger-800/40 shrink-0">
+              <UserX className="size-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-fg">Block {otherUser.name}?</h3>
+              <p className="text-xs text-fg-muted mt-0.5">They won't be able to message you.</p>
+            </div>
+          </div>
+          <p className="text-sm text-fg-muted leading-relaxed">
+            They won't be able to message you or find your profile. They will not be notified that you blocked them.
           </p>
-        </div>
-        <div className="-mx-5 -mb-5 border-t border-border-subtle flex flex-col">
-          <button
-            onClick={() => blockMutation.mutate()}
-            disabled={blockMutation.isPending}
-            className="py-3 text-sm font-semibold text-danger-500 hover:bg-surface-hover cursor-pointer border-b border-border-subtle disabled:opacity-50"
-          >
-            {blockMutation.isPending ? 'Blocking…' : 'Block'}
-          </button>
-          <button onClick={() => setShowBlockModal(false)} className="py-3 text-sm text-fg hover:bg-surface-hover cursor-pointer">
-            Cancel
-          </button>
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/70">
+            <Button variant="secondary" size="sm" onClick={() => setShowBlockModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              isLoading={blockMutation.isPending}
+              onClick={() => blockMutation.mutate()}
+            >
+              Block user
+            </Button>
+          </div>
         </div>
       </Modal>
 
       <Modal open={showDeleteModal} onClose={() => setShowDeleteModal(false)} size="sm">
-        <div className="flex flex-col items-center text-center gap-2 pb-4">
-          <p className="text-lg font-semibold text-fg">Delete chat from inbox?</p>
-          <p className="text-sm text-fg-muted">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-danger-50 dark:bg-danger-950/40 text-danger-600 dark:text-danger-400 border border-danger-200/60 dark:border-danger-800/40 shrink-0">
+              <Trash2 className="size-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-fg">Delete chat from inbox?</h3>
+              <p className="text-xs text-fg-muted mt-0.5">Clears history for your account.</p>
+            </div>
+          </div>
+          <p className="text-sm text-fg-muted leading-relaxed">
             This removes the chat from your inbox and erases your chat history. {otherUser.name} keeps their own copy.
           </p>
-        </div>
-        <div className="-mx-5 -mb-5 border-t border-border-subtle flex flex-col">
-          <button
-            onClick={() => deleteMutation.mutate()}
-            disabled={deleteMutation.isPending}
-            className="py-3 text-sm font-semibold text-danger-500 hover:bg-surface-hover cursor-pointer border-b border-border-subtle disabled:opacity-50"
-          >
-            {deleteMutation.isPending ? 'Deleting…' : 'Delete'}
-          </button>
-          <button onClick={() => setShowDeleteModal(false)} className="py-3 text-sm text-fg hover:bg-surface-hover cursor-pointer">
-            Cancel
-          </button>
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/70">
+            <Button variant="secondary" size="sm" onClick={() => setShowDeleteModal(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              isLoading={deleteMutation.isPending}
+              onClick={() => deleteMutation.mutate()}
+            >
+              Delete chat
+            </Button>
+          </div>
         </div>
       </Modal>
 
@@ -476,7 +494,7 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                     // available on every message — including ones sent by the other participant.
                     const isSelected = selectedIds.has(msg.id)
                     return (
-                      <div key={msg.id} className={cn('flex items-end gap-2', isOwn ? 'self-end flex-row-reverse' : 'self-start')}>
+                      <div key={msg.id} className={cn('group flex items-end gap-1.5', isOwn ? 'self-end flex-row-reverse' : 'self-start')}>
                         {!isOwn &&
                           (isLast ? (
                             <Avatar src={otherUser?.avatarUrl} name={otherUser?.name ?? ''} size="xs" />
@@ -499,7 +517,7 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                         )}
 
                         {msg.type === 'SHARED_POST' ? (
-                          <div className="flex items-end gap-1">
+                          <div className={cn('flex items-end gap-1.5', isOwn && 'flex-row-reverse')}>
                             <div className={cn('flex flex-col gap-1.5 max-w-[85%] sm:max-w-[75%]', isOwn && 'items-end')}>
                               <SharedPostPreview message={msg} conversationId={conversationId} />
                               {msg.content && (
@@ -515,10 +533,11 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                             </div>
                             {!selectMode && (
                               <DropdownMenu
+                                align={isOwn ? 'left' : 'right'}
                                 trigger={
                                   <button
                                     type="button"
-                                    className="flex size-7 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
+                                    className="flex size-7 items-center justify-center rounded-lg text-fg-muted/70 hover:text-fg hover:bg-surface-hover cursor-pointer transition-all opacity-0 group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-40 hover:!opacity-100"
                                     aria-label="Message options"
                                   >
                                     <MoreHorizontal className="size-4" />
@@ -532,7 +551,7 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                             )}
                           </div>
                         ) : (
-                          <div className={cn('flex items-end gap-1', isOwn && 'flex-row-reverse')}>
+                          <div className={cn('flex items-end gap-1.5', isOwn && 'flex-row-reverse')}>
                             <div
                               className={cn(
                                 'max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
@@ -547,7 +566,7 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                                 trigger={
                                   <button
                                     type="button"
-                                    className="flex size-7 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
+                                    className="flex size-7 items-center justify-center rounded-lg text-fg-muted/70 hover:text-fg hover:bg-surface-hover cursor-pointer transition-all opacity-0 group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-40 hover:!opacity-100"
                                     aria-label="Message options"
                                   >
                                     <MoreHorizontal className="size-4" />
@@ -600,27 +619,34 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
       )}
 
       <Modal open={deleteTarget !== null} onClose={() => setDeleteTarget(null)} size="sm">
-        <div className="flex flex-col items-center text-center gap-2 pb-4">
-          <p className="text-lg font-semibold text-fg">
-            {deleteTarget && deleteTarget.length > 1 ? `Delete ${deleteTarget.length} messages for you?` : 'Delete this message for you?'}
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-danger-50 dark:bg-danger-950/40 text-danger-600 dark:text-danger-400 border border-danger-200/60 dark:border-danger-800/40 shrink-0">
+              <Trash2 className="size-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-fg">
+                {deleteTarget && deleteTarget.length > 1 ? `Delete ${deleteTarget.length} messages for you?` : 'Delete message for you?'}
+              </h3>
+              <p className="text-xs text-fg-muted mt-0.5">Removed only from your personal view.</p>
+            </div>
+          </div>
+          <p className="text-sm text-fg-muted leading-relaxed">
+            This can't be undone. It only removes {deleteTarget && deleteTarget.length > 1 ? 'these messages' : 'this message'} from your own view — {otherUser?.name ?? 'the other person'} will still see {deleteTarget && deleteTarget.length > 1 ? 'them' : 'it'} normally.
           </p>
-          <p className="text-sm text-fg-muted">
-            This can't be undone. It only removes {deleteTarget && deleteTarget.length > 1 ? 'them' : 'it'} from your own view —{' '}
-            {otherUser?.name ?? 'the other person'} won't be notified and will still see{' '}
-            {deleteTarget && deleteTarget.length > 1 ? 'them' : 'it'} normally.
-          </p>
-        </div>
-        <div className="-mx-5 -mb-5 border-t border-border-subtle flex flex-col">
-          <button
-            onClick={confirmDelete}
-            disabled={hideMessagesMutation.isPending}
-            className="py-3 text-sm font-semibold text-danger-500 hover:bg-surface-hover cursor-pointer border-b border-border-subtle disabled:opacity-50"
-          >
-            {hideMessagesMutation.isPending ? 'Deleting…' : 'Delete for me'}
-          </button>
-          <button onClick={() => setDeleteTarget(null)} className="py-3 text-sm text-fg hover:bg-surface-hover cursor-pointer">
-            Cancel
-          </button>
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/70">
+            <Button variant="secondary" size="sm" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              size="sm"
+              isLoading={hideMessagesMutation.isPending}
+              onClick={confirmDelete}
+            >
+              Delete for me
+            </Button>
+          </div>
         </div>
       </Modal>
     </div>
