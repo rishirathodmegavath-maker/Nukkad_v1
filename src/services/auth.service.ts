@@ -14,6 +14,7 @@ interface AuthResponseDto {
 interface RegisterResponseDto {
   email: string
   message: string
+  verified: boolean
 }
 
 function toSession(dto: AuthResponseDto): Session {

@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { Mail, Lock, User, CheckCircle2 } from 'lucide-react'
 import { AuthLayout } from './AuthLayout'
 import { Input, PasswordInput } from '@/components/ui/Input'
@@ -21,6 +21,7 @@ function isStrongPassword(password: string): boolean {
 }
 
 export default function SignupPage() {
+  const navigate = useNavigate()
   const signup = useAuthStore((s) => s.signup)
   const [firstName, setFirstName] = useState('')
   const [lastName, setLastName] = useState('')
@@ -51,6 +52,11 @@ export default function SignupPage() {
     try {
       const name = `${firstName.trim()} ${lastName.trim()}`.trim()
       const result = await signup({ name, email, password })
+      if (result.verified) {
+        toast.success('Account created — you can log in now.')
+        navigate('/login', { replace: true })
+        return
+      }
       setRegisteredEmail(result.email)
     } catch (err) {
       setFormError(err instanceof Error ? err.message : 'Something went wrong.')
