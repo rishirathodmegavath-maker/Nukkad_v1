@@ -27,21 +27,23 @@ export default function SignupPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState('')
+  const [fieldError, setFieldError] = useState('')
+  const [formError, setFormError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [registeredEmail, setRegisteredEmail] = useState<string | null>(null)
   const [isResending, setIsResending] = useState(false)
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
-    setError('')
+    setFieldError('')
+    setFormError('')
 
     if (!isStrongPassword(password)) {
-      setError(PASSWORD_REQUIREMENTS)
+      setFieldError(PASSWORD_REQUIREMENTS)
       return
     }
     if (password !== confirmPassword) {
-      setError('Passwords do not match')
+      setFieldError('Passwords do not match')
       return
     }
 
@@ -51,7 +53,7 @@ export default function SignupPage() {
       const result = await signup({ name, email, password })
       setRegisteredEmail(result.email)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Something went wrong.')
+      setFormError(err instanceof Error ? err.message : 'Something went wrong.')
     } finally {
       setIsLoading(false)
     }
@@ -155,8 +157,13 @@ export default function SignupPage() {
           onChange={(e) => setConfirmPassword(e.target.value)}
           leftIcon={<Lock className="size-4" />}
           placeholder="Re-enter your password"
-          error={error || undefined}
+          error={fieldError || undefined}
         />
+        {formError && (
+          <p role="alert" className="text-sm text-danger-500 -mt-2">
+            {formError}
+          </p>
+        )}
         <Button type="submit" size="lg" isLoading={isLoading} className="w-full mt-2">
           Create account
         </Button>
