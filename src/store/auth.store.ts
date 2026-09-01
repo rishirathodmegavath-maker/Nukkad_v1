@@ -9,7 +9,7 @@ interface AuthState {
   isAuthenticated: boolean
   init: () => void
   login: (credentials: LoginCredentials) => Promise<void>
-  signup: (payload: SignupPayload) => Promise<{ email: string; message: string }>
+  signup: (payload: SignupPayload) => Promise<{ email: string; message: string; verified: boolean }>
   completeGoogleLogin: (code: string, redirectUri: string) => Promise<void>
   logout: () => Promise<void>
 }
