@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -31,6 +31,7 @@ import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Modal } from '@/components/ui/Modal'
 import { DropdownMenu, DropdownItem } from '@/components/ui/DropdownMenu'
+import { PillTabs } from '@/components/ui/Tabs'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ReportModal } from '@/components/domain/ReportModal'
@@ -1075,6 +1076,14 @@ export default function MessagesPage() {
   const navigate = useNavigate()
   const { data: conversations, isLoading, refetch } = useConversations()
   const [showCreateGroup, setShowCreateGroup] = useState(false)
+  const [filter, setFilter] = useState<'all' | 'direct' | 'group'>('all')
+
+  const directCount = conversations?.filter((c) => c.type !== 'GROUP').length ?? 0
+  const groupCount = conversations?.filter((c) => c.type === 'GROUP').length ?? 0
+  const filteredConversations = useMemo(() => {
+    if (!conversations || filter === 'all') return conversations
+    return conversations.filter((c) => (filter === 'group' ? c.type === 'GROUP' : c.type !== 'GROUP'))
+  }, [conversations, filter])
 
   useEffect(() => {
     // Only auto-select a conversation on wider desktop screens (>= 640px)
@@ -1116,18 +1125,37 @@ export default function MessagesPage() {
             <Users className="size-3.5" /> New group
           </button>
         </div>
+        {conversations && conversations.length > 0 && (
+          <div className="px-2 pb-2.5">
+            <PillTabs
+              items={[
+                { key: 'all', label: 'All', count: conversations.length },
+                { key: 'direct', label: 'Direct', count: directCount },
+                { key: 'group', label: 'Groups', count: groupCount },
+              ]}
+              value={filter}
+              onChange={(k) => setFilter(k as 'all' | 'direct' | 'group')}
+            />
+          </div>
+        )}
         {isLoading ? (
           <div className="flex flex-col gap-2 p-1">
             <Skeleton className="h-16 w-full rounded-xl" />
             <Skeleton className="h-16 w-full rounded-xl" />
             <Skeleton className="h-16 w-full rounded-xl" />
           </div>
-        ) : conversations && conversations.length > 0 ? (
+        ) : filteredConversations && filteredConversations.length > 0 ? (
           <div className="flex flex-col gap-2">
-            {conversations.map((c) => (
+            {filteredConversations.map((c) => (
               <ConversationListItem key={c.id} conversation={c} active={c.id === conversationId} />
             ))}
           </div>
+        ) : conversations && conversations.length > 0 ? (
+          <EmptyState
+            icon={<MessageSquare className="size-5" />}
+            title={filter === 'group' ? 'No groups yet' : 'No direct messages yet'}
+            className="border-none py-10"
+          />
         ) : (
           <EmptyState icon={<MessageSquare className="size-5" />} title="No conversations yet" className="border-none py-10" />
         )}
