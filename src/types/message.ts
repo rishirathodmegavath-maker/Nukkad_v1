@@ -23,6 +23,10 @@ export interface Message {
   replyTo?: RepliedMessagePreview
   createdAt: string
   isRead: boolean
+  readAt?: string
+  /** Client-only, never persisted: an optimistic row still in flight, or one whose send failed. */
+  pending?: boolean
+  failed?: boolean
 }
 
 export interface GroupParticipant {

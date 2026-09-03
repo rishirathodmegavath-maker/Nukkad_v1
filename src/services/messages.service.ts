@@ -21,6 +21,7 @@ export interface MessageDto {
   replyToMessageId: string | null
   replyTo: RepliedMessagePreviewDto | null
   isRead: boolean
+  readAt: string | null
   createdAt: string
 }
 
@@ -66,6 +67,7 @@ export function mapMessage(dto: MessageDto): Message {
       : undefined,
     createdAt: dto.createdAt,
     isRead: dto.isRead,
+    readAt: dto.readAt ?? undefined,
   }
 }
 

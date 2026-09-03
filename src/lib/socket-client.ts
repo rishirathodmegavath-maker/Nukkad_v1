@@ -50,7 +50,7 @@ export function subscribeToConversation<T>(conversationId: string, onMessage: (p
   return subscribe<T>(`/topic/conversations/${conversationId}`, onMessage)
 }
 
-export function subscribeToConversationReads(conversationId: string, onRead: (payload: { readBy: string }) => void) {
+export function subscribeToConversationReads(conversationId: string, onRead: (payload: { readBy: string; readAt: string }) => void) {
   return subscribe(`/topic/conversations/${conversationId}/read`, onRead)
 }
 

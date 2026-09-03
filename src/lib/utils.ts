@@ -59,6 +59,27 @@ export function formatTimeOnly(iso: string) {
   })
 }
 
+/** "just now" / "Xm ago" / "Xh ago" / "yesterday" / "Sep 2" — the exact Instagram-style read-receipt
+ * phrasing, which formatRelativeTime doesn't produce (it says "1d ago" and keeps the year). */
+export function formatSeenTime(iso: string): string {
+  const date = new Date(iso)
+  const now = new Date()
+  const diffSec = Math.floor((now.getTime() - date.getTime()) / 1000)
+  const diffMin = Math.floor(diffSec / 60)
+  const diffHr = Math.floor(diffMin / 60)
+
+  if (diffSec < 60) return 'just now'
+  if (diffMin < 60) return `${diffMin}m ago`
+  if (diffHr < 24) return `${diffHr}h ago`
+
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startOfYesterday = new Date(startOfToday)
+  startOfYesterday.setDate(startOfYesterday.getDate() - 1)
+  if (date >= startOfYesterday && date < startOfToday) return 'yesterday'
+
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
 export function formatDateOnly(iso: string) {
   return new Date(iso).toLocaleDateString(undefined, {
     weekday: 'short',

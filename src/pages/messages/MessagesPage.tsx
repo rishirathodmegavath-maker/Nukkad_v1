@@ -38,7 +38,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { ReportModal } from '@/components/domain/ReportModal'
 import { CreateGroupModal } from '@/components/domain/CreateGroupModal'
 import { toast } from '@/store/toast.store'
-import { cn, formatRelativeTime, formatDateTime } from '@/lib/utils'
+import { cn, formatRelativeTime, formatDateTime, formatSeenTime } from '@/lib/utils'
 import type { Conversation, Message, User } from '@/types'
 
 function groupDisplayName(conversation: Conversation): string {
@@ -726,10 +726,18 @@ function ReplyPreviewStrip({
   )
 }
 
+function getMessageStatusLabel(msg: Message): string {
+  if (msg.failed) return 'Failed to send'
+  if (msg.pending) return 'Sending…'
+  if (msg.isRead) return `Seen ${msg.readAt ? formatSeenTime(msg.readAt) : 'just now'}`
+  return 'Sent'
+}
+
 function MessageRow({
   msg,
   isOwn,
   isLast,
+  isLastOwnMessage,
   isGroup,
   otherUser,
   selectMode,
@@ -742,10 +750,12 @@ function MessageRow({
   onReply,
   onDelete,
   onJumpToMessage,
+  onRetry,
 }: {
   msg: Message
   isOwn: boolean
   isLast: boolean
+  isLastOwnMessage: boolean
   isGroup: boolean
   otherUser?: User
   selectMode: boolean
@@ -758,16 +768,21 @@ function MessageRow({
   onReply: () => void
   onDelete: () => void
   onJumpToMessage: (messageId: string) => void
+  onRetry: () => void
 }) {
   // Swipe is a mobile-only affordance in practice: without a touchscreen no touchstart ever
   // fires, so this is fully inert on desktop and the existing hover/dropdown reply path is
   // untouched. Disabled during select-mode so a drag can't fight message multi-select.
+  // A pending/failed send has no real server id yet, so replying to it or deleting it would hit
+  // the API with a temp id — both actions (and the swipe gesture that leads to one of them) are
+  // disabled until it's actually persisted.
+  const actionsEnabled = !selectMode && !msg.pending && !msg.failed
   const {
     ref: swipeRef,
     revealWidth,
     revealOpacity,
     isDragging,
-  } = useSwipeToReply<HTMLDivElement>({ onTriggered: onReply, enabled: !selectMode })
+  } = useSwipeToReply<HTMLDivElement>({ onTriggered: onReply, enabled: actionsEnabled })
 
   const replyRevealIcon = (
     <div
@@ -782,7 +797,7 @@ function MessageRow({
     </div>
   )
 
-  const messageOptionsMenu = !selectMode && (
+  const messageOptionsMenu = actionsEnabled && (
     <DropdownMenu
       align={isOwn ? 'right' : 'left'}
       className="min-w-[150px]"
@@ -820,92 +835,119 @@ function MessageRow({
       // ever calls preventDefault once a gesture is confirmed horizontal.
       className={cn('flex w-full touch-pan-y', isOwn ? 'justify-end' : 'justify-start')}
     >
-      <div className={cn('group flex items-end gap-1.5 max-w-[85%] sm:max-w-[70%]', isOwn && 'flex-row-reverse')}>
-        {!isOwn &&
-          (isLast ? (
-            <MessageSenderAvatar senderId={msg.senderId} isGroup={isGroup} otherUser={otherUser} />
-          ) : (
-            <span className="size-6 shrink-0" />
-          ))}
+      {/* This wrapper — not the row above — carries the percentage max-width, and everything
+          inside it uses max-w-full (100%) instead: percentages only resolve correctly against a
+          definite ancestor width, and the w-full row above is the last definite one in the chain.
+          Nesting the % cap any deeper, against a shrink-to-fit ancestor, makes the browser size
+          that ancestor to exactly the bubble's own content — so "70% of it" always clips below
+          the content's natural size and messages wrap far too early. */}
+      <div className={cn('flex flex-col gap-0.5 max-w-[85%] sm:max-w-[70%]', isOwn ? 'items-end' : 'items-start')}>
+        <div className={cn('group flex items-end gap-1.5 max-w-full', isOwn && 'flex-row-reverse')}>
+          {!isOwn &&
+            (isLast ? (
+              <MessageSenderAvatar senderId={msg.senderId} isGroup={isGroup} otherUser={otherUser} />
+            ) : (
+              <span className="size-6 shrink-0" />
+            ))}
 
-        {selectMode && (
-          <button
-            type="button"
-            onClick={() => onToggleSelected(msg.id)}
-            aria-label={isSelected ? 'Deselect message' : 'Select message'}
+          {selectMode && (
+            <button
+              type="button"
+              onClick={() => onToggleSelected(msg.id)}
+              aria-label={isSelected ? 'Deselect message' : 'Select message'}
+              className={cn(
+                'flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors cursor-pointer',
+                isSelected ? 'bg-brand-600 border-brand-600 text-white' : 'border-border-strong hover:border-brand-500',
+              )}
+            >
+              {isSelected && <Check className="size-3" />}
+            </button>
+          )}
+
+          {msg.type === 'SHARED_POST' ? (
+            <>
+              {/* iconSlot + content share one never-reversed inner row, so growing the icon
+                  always pushes THIS content right — a direct sibling of the reversed outer
+                  row would instead push whatever comes after it (the options button) on an
+                  own-message, leaving the bubble itself looking like it never moved. */}
+              <div className="flex items-end">
+                {replyRevealIcon}
+                <div
+                  className={cn(
+                    'flex flex-col gap-1.5 min-w-0 transition-shadow duration-500 rounded-xl',
+                    isOwn && 'items-end',
+                    highlightedMessageId === msg.id && 'ring-2 ring-brand-500',
+                  )}
+                >
+                  <SharedPostPreview message={msg} conversationId={conversationId} />
+                  {msg.content && (
+                    <div
+                      className={cn(
+                        'w-fit max-w-full rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words',
+                        isOwn ? 'bg-brand-600 text-white rounded-br-sm' : 'bg-surface-sunken text-fg rounded-bl-sm border border-border/60',
+                      )}
+                    >
+                      {msg.replyTo && (
+                        <ReplyPreviewStrip
+                          replyTo={msg.replyTo}
+                          isOwn={isOwn}
+                          replySenderId={msg.senderId}
+                          currentUserId={myId}
+                          onJumpToMessage={onJumpToMessage}
+                        />
+                      )}
+                      {msg.content}
+                    </div>
+                  )}
+                </div>
+              </div>
+              {messageOptionsMenu}
+            </>
+          ) : (
+            <>
+              <div className="flex items-end">
+                {replyRevealIcon}
+                <div
+                  className={cn(
+                    'w-fit min-w-0 max-w-full rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words transition-shadow duration-500',
+                    isOwn ? 'bg-brand-600 text-white rounded-br-sm shadow-2xs' : 'bg-surface-sunken text-fg rounded-bl-sm border border-border/60',
+                    highlightedMessageId === msg.id && 'ring-2 ring-brand-500',
+                  )}
+                >
+                  {msg.replyTo && (
+                    <ReplyPreviewStrip
+                      replyTo={msg.replyTo}
+                      isOwn={isOwn}
+                      replySenderId={msg.senderId}
+                      currentUserId={myId}
+                      onJumpToMessage={onJumpToMessage}
+                    />
+                  )}
+                  {msg.content}
+                </div>
+              </div>
+              {messageOptionsMenu}
+            </>
+          )}
+        </div>
+
+        {/* Instagram-style text status — Sent / Seen <time>, never a checkmark — shown only on the
+            most recent message I sent, matching how Instagram avoids repeating it on every bubble. */}
+        {isOwn && isLastOwnMessage && (
+          <p
+            key={getMessageStatusLabel(msg)}
             className={cn(
-              'flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors cursor-pointer',
-              isSelected ? 'bg-brand-600 border-brand-600 text-white' : 'border-border-strong hover:border-brand-500',
+              'text-[10px] px-1 animate-in fade-in duration-300',
+              msg.failed ? 'text-danger-500' : 'text-fg-muted/80',
             )}
           >
-            {isSelected && <Check className="size-3" />}
-          </button>
-        )}
-
-        {msg.type === 'SHARED_POST' ? (
-          <>
-            {/* iconSlot + content share one never-reversed inner row, so growing the icon
-                always pushes THIS content right — a direct sibling of the reversed outer
-                row would instead push whatever comes after it (the options button) on an
-                own-message, leaving the bubble itself looking like it never moved. */}
-            <div className="flex items-end">
-              {replyRevealIcon}
-              <div
-                className={cn(
-                  'flex flex-col gap-1.5 min-w-0 transition-shadow duration-500 rounded-xl',
-                  isOwn && 'items-end',
-                  highlightedMessageId === msg.id && 'ring-2 ring-brand-500',
-                )}
-              >
-                <SharedPostPreview message={msg} conversationId={conversationId} />
-                {msg.content && (
-                  <div
-                    className={cn(
-                      'w-fit max-w-full rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words',
-                      isOwn ? 'bg-brand-600 text-white rounded-br-sm' : 'bg-surface-sunken text-fg rounded-bl-sm border border-border/60',
-                    )}
-                  >
-                    {msg.replyTo && (
-                      <ReplyPreviewStrip
-                        replyTo={msg.replyTo}
-                        isOwn={isOwn}
-                        replySenderId={msg.senderId}
-                        currentUserId={myId}
-                        onJumpToMessage={onJumpToMessage}
-                      />
-                    )}
-                    {msg.content}
-                  </div>
-                )}
-              </div>
-            </div>
-            {messageOptionsMenu}
-          </>
-        ) : (
-          <>
-            <div className="flex items-end">
-              {replyRevealIcon}
-              <div
-                className={cn(
-                  'w-fit min-w-0 max-w-full rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words transition-shadow duration-500',
-                  isOwn ? 'bg-brand-600 text-white rounded-br-sm shadow-2xs' : 'bg-surface-sunken text-fg rounded-bl-sm border border-border/60',
-                  highlightedMessageId === msg.id && 'ring-2 ring-brand-500',
-                )}
-              >
-                {msg.replyTo && (
-                  <ReplyPreviewStrip
-                    replyTo={msg.replyTo}
-                    isOwn={isOwn}
-                    replySenderId={msg.senderId}
-                    currentUserId={myId}
-                    onJumpToMessage={onJumpToMessage}
-                  />
-                )}
-                {msg.content}
-              </div>
-            </div>
-            {messageOptionsMenu}
-          </>
+            {getMessageStatusLabel(msg)}
+            {msg.failed && (
+              <button type="button" onClick={onRetry} className="ml-1.5 font-semibold underline cursor-pointer">
+                Retry
+              </button>
+            )}
+          </p>
         )}
       </div>
     </div>
@@ -942,6 +984,7 @@ function ComposerReplyPreview({
 
 function ChatPanel({ conversationId }: { conversationId: string }) {
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const { data: conversations } = useConversations()
   const currentConversation = conversations?.find((c) => c.id === conversationId)
   const isGroup = currentConversation?.type === 'GROUP'
@@ -1036,12 +1079,35 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
   function handleSend(e: FormEvent) {
     e.preventDefault()
     if (!draft.trim()) return
-    sendMutation.mutate({ content: draft.trim(), replyToMessageId: replyingTo?.id })
+    const replyToPreview: Message['replyTo'] = replyingTo
+      ? {
+          id: replyingTo.id,
+          senderId: replyingTo.senderId,
+          type: replyingTo.type,
+          contentSnippet: replyingTo.type === 'SHARED_POST' ? 'Shared a post' : replyingTo.content.slice(0, 120),
+        }
+      : undefined
+    sendMutation.mutate({ content: draft.trim(), replyToMessageId: replyingTo?.id, replyToPreview })
     setDraft('')
     setReplyingTo(null)
   }
 
+  function retryFailedMessage(msg: Message) {
+    queryClient.setQueryData<Message[]>(['messages', conversationId], (existing) => existing?.filter((m) => m.id !== msg.id))
+    sendMutation.mutate({ content: msg.content, replyToMessageId: msg.replyToMessageId, replyToPreview: msg.replyTo })
+  }
+
   const groups = messages ? groupMessages(messages) : []
+  const lastOwnMessageId = [...(messages ?? [])].reverse().find((m) => m.senderId === myId)?.id ?? null
+
+  // The status line's relative time ("Seen 2m ago" -> "Seen 3m ago") only advances if something
+  // re-renders it — nothing else in this component changes on a pure time tick, so this exists
+  // purely to keep that text live without needing a page action.
+  const [, forceStatusTick] = useState(0)
+  useEffect(() => {
+    const id = window.setInterval(() => forceStatusTick((t) => t + 1), 30_000)
+    return () => window.clearInterval(id)
+  }, [])
 
   return (
     <div className="flex h-full flex-1 min-w-0">
@@ -1147,6 +1213,7 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                         msg={msg}
                         isOwn={isOwn}
                         isLast={isLast}
+                        isLastOwnMessage={msg.id === lastOwnMessageId}
                         isGroup={!!isGroup}
                         otherUser={otherUser}
                         selectMode={selectMode}
@@ -1162,6 +1229,7 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                         onReply={() => setReplyingTo(msg)}
                         onDelete={() => setDeleteTarget([msg.id])}
                         onJumpToMessage={jumpToMessage}
+                        onRetry={() => retryFailedMessage(msg)}
                       />
                     )
                   })}

@@ -2,7 +2,7 @@ import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import * as messagesService from '@/services/messages.service'
 import { getCurrentUserId } from '@/services/users.service'
-import { subscribeToConversation, subscribeToUserConversations } from '@/lib/socket-client'
+import { subscribeToConversation, subscribeToConversationReads, subscribeToUserConversations } from '@/lib/socket-client'
 import type { Conversation, Message } from '@/types'
 import { mapConversation, mapMessage, type ConversationDto, type MessageDto } from '@/services/messages.service'
 
@@ -39,6 +39,7 @@ export function useUnreadMessageCount() {
 
 export function useMessages(conversationId: string | undefined) {
   const queryClient = useQueryClient()
+  const myId = getCurrentUserId()
 
   useEffect(() => {
     if (!conversationId) return
@@ -52,6 +53,20 @@ export function useMessages(conversationId: string | undefined) {
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
     })
   }, [conversationId, queryClient])
+
+  // Real read receipts, not a faked status: this event fires for GROUP conversations too, but the
+  // backend only ever flips the per-message is_read/read_at columns for DIRECT ones (group read
+  // state is a single per-participant watermark, not per message — see markRead). Refetching and
+  // trusting whatever the server actually returns — rather than optimistically flipping isRead
+  // ourselves here — is what keeps a group's messages honestly stuck at "Sent" instead of this
+  // event making every message falsely claim "Seen" the moment any one member opens the thread.
+  useEffect(() => {
+    if (!conversationId || !myId) return
+    return subscribeToConversationReads(conversationId, ({ readBy }) => {
+      if (readBy === myId) return // that's me marking it read, not the other person reading mine
+      queryClient.invalidateQueries({ queryKey: ['messages', conversationId] })
+    })
+  }, [conversationId, myId, queryClient])
 
   return useQuery({
     queryKey: ['messages', conversationId],
@@ -77,16 +92,55 @@ export function useHideMessagesForMe(conversationId: string | undefined) {
   })
 }
 
+interface SendMessageVariables {
+  content: string
+  replyToMessageId?: string
+  /** Built by the caller from the message it already has in hand (the one being replied to), so
+   * the optimistic bubble can render a real reply quote immediately instead of a blank one. */
+  replyToPreview?: Message['replyTo']
+}
+
+/** Optimistic send: a "Sending…" placeholder appears immediately (client-generated temp id),
+ * is swapped for the real persisted message on success, or flipped to a "Failed to send" state
+ * (kept in the list, not discarded) on error so the existing retry affordance has something to
+ * act on. */
 export function useSendMessage(conversationId: string | undefined) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: ({ content, replyToMessageId }: { content: string; replyToMessageId?: string }) =>
+    mutationFn: ({ content, replyToMessageId }: SendMessageVariables) =>
       messagesService.sendMessage(conversationId!, content, undefined, replyToMessageId),
-    onSuccess: (message) => {
+    onMutate: ({ content, replyToMessageId, replyToPreview }) => {
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+      const myId = getCurrentUserId() ?? ''
+      const optimistic: Message = {
+        id: tempId,
+        conversationId: conversationId!,
+        senderId: myId,
+        type: 'TEXT',
+        content,
+        replyToMessageId,
+        replyTo: replyToPreview,
+        createdAt: new Date().toISOString(),
+        isRead: false,
+        pending: true,
+      }
       queryClient.setQueryData<Message[]>(['messages', conversationId], (existing) =>
-        existing ? [...existing.filter((m) => m.id !== message.id), message] : [message],
+        existing ? [...existing, optimistic] : [optimistic],
       )
+      return { tempId }
+    },
+    onSuccess: (message, _vars, context) => {
+      queryClient.setQueryData<Message[]>(['messages', conversationId], (existing) => {
+        const withoutTemp = (existing ?? []).filter((m) => m.id !== context?.tempId && m.id !== message.id)
+        return [...withoutTemp, message]
+      })
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    },
+    onError: (_err, _vars, context) => {
+      if (!context?.tempId) return
+      queryClient.setQueryData<Message[]>(['messages', conversationId], (existing) =>
+        existing?.map((m) => (m.id === context.tempId ? { ...m, pending: false, failed: true } : m)),
+      )
     },
   })
 }
