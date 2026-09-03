@@ -1,7 +1,14 @@
-import { apiClient, getPage } from '@/lib/api-client'
+import { apiClient, getPage, uploadFile } from '@/lib/api-client'
 import { getCurrentUserId } from '@/services/users.service'
 import { mapPost, type PostDto } from '@/services/feed.service'
-import type { Conversation, Message, MessageType } from '@/types'
+import type { Conversation, ConversationType, GroupRole, Message, MessageType } from '@/types'
+
+interface RepliedMessagePreviewDto {
+  id: string
+  senderId: string
+  type: string
+  contentSnippet: string
+}
 
 export interface MessageDto {
   id: string
@@ -11,13 +18,30 @@ export interface MessageDto {
   content: string
   sharedPostId: string | null
   sharedPost: PostDto | null
+  replyToMessageId: string | null
+  replyTo: RepliedMessagePreviewDto | null
   isRead: boolean
   createdAt: string
 }
 
+interface GroupParticipantDto {
+  userId: string
+  role: string
+}
+
+interface GroupInfoDto {
+  name: string
+  avatarUrl: string | null
+  createdBy: string
+  myRole: string
+  participants: GroupParticipantDto[]
+}
+
 export interface ConversationDto {
   id: string
-  otherUserId: string
+  conversationType: string
+  otherUserId: string | null
+  groupInfo: GroupInfoDto | null
   lastMessage: MessageDto | null
   unreadCount: number
   updatedAt: string
@@ -36,6 +60,10 @@ export function mapMessage(dto: MessageDto): Message {
     content: dto.content,
     sharedPostId: dto.sharedPostId ?? undefined,
     sharedPost: dto.sharedPost ? mapPost(dto.sharedPost) : undefined,
+    replyToMessageId: dto.replyToMessageId ?? undefined,
+    replyTo: dto.replyTo
+      ? { id: dto.replyTo.id, senderId: dto.replyTo.senderId, type: dto.replyTo.type as MessageType, contentSnippet: dto.replyTo.contentSnippet }
+      : undefined,
     createdAt: dto.createdAt,
     isRead: dto.isRead,
   }
@@ -44,10 +72,24 @@ export function mapMessage(dto: MessageDto): Message {
 /** Exported so live WebSocket pushes (raw backend DTO shape) can be mapped before entering the query cache. */
 export function mapConversation(dto: ConversationDto): Conversation {
   const me = getCurrentUserId() ?? ''
+  const participantIds = dto.groupInfo
+    ? dto.groupInfo.participants.map((p) => p.userId)
+    : [me, dto.otherUserId ?? '']
   return {
     id: dto.id,
-    participantIds: [me, dto.otherUserId],
+    type: dto.conversationType as ConversationType,
+    participantIds,
+    group: dto.groupInfo
+      ? {
+          name: dto.groupInfo.name,
+          avatarUrl: dto.groupInfo.avatarUrl ?? undefined,
+          createdBy: dto.groupInfo.createdBy,
+          myRole: dto.groupInfo.myRole as GroupRole,
+          participants: dto.groupInfo.participants.map((p) => ({ userId: p.userId, role: p.role as GroupRole })),
+        }
+      : undefined,
     lastMessage: dto.lastMessage ? mapMessage(dto.lastMessage) : undefined,
+    unreadCount: dto.unreadCount,
     updatedAt: dto.updatedAt,
     muted: dto.muted,
     nickname: dto.nickname ?? undefined,
@@ -75,8 +117,17 @@ export async function listMessages(conversationId: string): Promise<Message[]> {
   return dtos.map(mapMessage)
 }
 
-export async function sendMessage(conversationId: string, content: string, sharedPostId?: string): Promise<Message> {
-  const dto = await apiClient.post<MessageDto>(`/conversations/${conversationId}/messages`, { content, sharedPostId })
+export async function sendMessage(
+  conversationId: string,
+  content: string,
+  sharedPostId?: string,
+  replyToMessageId?: string,
+): Promise<Message> {
+  const dto = await apiClient.post<MessageDto>(`/conversations/${conversationId}/messages`, {
+    content,
+    sharedPostId,
+    replyToMessageId,
+  })
   return mapMessage(dto)
 }
 
@@ -107,4 +158,38 @@ export async function hideMessageForMe(conversationId: string, messageId: string
 export async function hideMessagesForMe(conversationId: string, messageIds: string[]): Promise<void> {
   const query = messageIds.map((id) => `messageIds=${encodeURIComponent(id)}`).join('&')
   await apiClient.delete(`/conversations/${conversationId}/messages?${query}`)
+}
+
+export async function createGroup(name: string, memberIds: string[]): Promise<Conversation> {
+  const dto = await apiClient.post<ConversationDto>('/conversations/group', { name, memberIds })
+  return mapConversation(dto)
+}
+
+export async function renameGroup(conversationId: string, name: string): Promise<Conversation> {
+  const dto = await apiClient.patch<ConversationDto>(`/conversations/${conversationId}/group`, { name })
+  return mapConversation(dto)
+}
+
+export async function setGroupAvatar(conversationId: string, file: File): Promise<Conversation> {
+  const dto = await uploadFile<ConversationDto>(`/conversations/${conversationId}/group/avatar`, file)
+  return mapConversation(dto)
+}
+
+export async function addGroupMembers(conversationId: string, memberIds: string[]): Promise<Conversation> {
+  const dto = await apiClient.post<ConversationDto>(`/conversations/${conversationId}/group/members`, { memberIds })
+  return mapConversation(dto)
+}
+
+export async function removeGroupMember(conversationId: string, userId: string): Promise<Conversation> {
+  const dto = await apiClient.delete<ConversationDto>(`/conversations/${conversationId}/group/members/${userId}`)
+  return mapConversation(dto)
+}
+
+export async function leaveGroup(conversationId: string): Promise<void> {
+  await apiClient.post(`/conversations/${conversationId}/group/leave`)
+}
+
+export async function updateGroupRole(conversationId: string, userId: string, role: GroupRole): Promise<Conversation> {
+  const dto = await apiClient.patch<ConversationDto>(`/conversations/${conversationId}/group/members/${userId}/role`, { role })
+  return mapConversation(dto)
 }

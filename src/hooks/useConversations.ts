@@ -32,10 +32,9 @@ export function useConversations() {
 }
 
 export function useUnreadMessageCount() {
-  const myId = getCurrentUserId()
   const { data } = useConversations()
   if (!data) return 0
-  return data.filter((c) => c.lastMessage && c.lastMessage.senderId !== myId && !c.lastMessage.isRead).length
+  return data.filter((c) => c.unreadCount > 0).length
 }
 
 export function useMessages(conversationId: string | undefined) {
@@ -81,7 +80,8 @@ export function useHideMessagesForMe(conversationId: string | undefined) {
 export function useSendMessage(conversationId: string | undefined) {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: (content: string) => messagesService.sendMessage(conversationId!, content),
+    mutationFn: ({ content, replyToMessageId }: { content: string; replyToMessageId?: string }) =>
+      messagesService.sendMessage(conversationId!, content, undefined, replyToMessageId),
     onSuccess: (message) => {
       queryClient.setQueryData<Message[]>(['messages', conversationId], (existing) =>
         existing ? [...existing.filter((m) => m.id !== message.id), message] : [message],

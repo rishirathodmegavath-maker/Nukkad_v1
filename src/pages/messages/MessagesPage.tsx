@@ -1,7 +1,27 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useNavigate, useParams, Link } from 'react-router-dom'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { Send, MessageSquare, Info, X, Bell, UserX, Flag, Trash2, ImageOff, ArrowLeft, MoreHorizontal, CheckSquare, Check } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  Send,
+  MessageSquare,
+  Info,
+  X,
+  Bell,
+  UserX,
+  Flag,
+  Trash2,
+  ImageOff,
+  ArrowLeft,
+  MoreHorizontal,
+  CheckSquare,
+  Check,
+  Reply,
+  Users,
+  UserPlus,
+  LogOut,
+  Crown,
+  Pencil,
+} from 'lucide-react'
 import { useConversations, useMessages, useSendMessage, useMarkConversationRead, useHideMessagesForMe } from '@/hooks/useConversations'
 import { useUser } from '@/hooks/useUser'
 import { getCurrentUserId } from '@/services/users.service'
@@ -14,9 +34,25 @@ import { DropdownMenu, DropdownItem } from '@/components/ui/DropdownMenu'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ReportModal } from '@/components/domain/ReportModal'
+import { CreateGroupModal } from '@/components/domain/CreateGroupModal'
 import { toast } from '@/store/toast.store'
 import { cn, formatRelativeTime, formatDateTime } from '@/lib/utils'
 import type { Conversation, Message, User } from '@/types'
+
+function groupDisplayName(conversation: Conversation): string {
+  return conversation.group?.name || 'Group'
+}
+
+function GroupAvatar({ conversation, size = 'md' }: { conversation: Conversation; size?: 'sm' | 'md' }) {
+  const dim = size === 'sm' ? 'size-9' : 'size-10'
+  return conversation.group?.avatarUrl ? (
+    <img src={conversation.group.avatarUrl} alt="" className={cn(dim, 'rounded-full object-cover shrink-0')} />
+  ) : (
+    <span className={cn(dim, 'shrink-0 rounded-full bg-surface-sunken border border-border flex items-center justify-center text-fg-muted')}>
+      <Users className="size-4" />
+    </span>
+  )
+}
 
 function SharedPostPreview({ message, conversationId }: { message: Message; conversationId: string }) {
   const post = message.sharedPost
@@ -50,12 +86,14 @@ function SharedPostPreview({ message, conversationId }: { message: Message; conv
 
 function ConversationListItem({ conversation, active }: { conversation: Conversation; active: boolean }) {
   const navigate = useNavigate()
+  const isGroup = conversation.type === 'GROUP'
   const otherUserId = conversation.participantIds.find((p) => p !== getCurrentUserId())
-  const { data: user } = useUser(otherUserId)
-  if (!user) return <Skeleton className="h-16 w-full rounded-xl" />
+  const { data: user } = useUser(isGroup ? undefined : otherUserId)
+  if (!isGroup && !user) return <Skeleton className="h-16 w-full rounded-xl" />
 
   const lastMessage = conversation.lastMessage
-  const unread = lastMessage && lastMessage.senderId !== getCurrentUserId() && !lastMessage.isRead
+  const unread = conversation.unreadCount > 0
+  const title = isGroup ? groupDisplayName(conversation) : conversation.nickname || user!.name
 
   return (
     <button
@@ -67,12 +105,10 @@ function ConversationListItem({ conversation, active }: { conversation: Conversa
           : 'border-border/70 hover:border-border-strong hover:bg-surface-hover hover:shadow-2xs',
       )}
     >
-      <Avatar src={user.avatarUrl} name={user.name} size="md" />
+      {isGroup ? <GroupAvatar conversation={conversation} /> : <Avatar src={user!.avatarUrl} name={user!.name} size="md" />}
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <p className={cn('text-sm truncate', unread ? 'font-semibold text-fg' : 'font-medium text-fg')}>
-            {conversation.nickname || user.name}
-          </p>
+          <p className={cn('text-sm truncate', unread ? 'font-semibold text-fg' : 'font-medium text-fg')}>{title}</p>
           {lastMessage && <span className="text-xs text-fg-muted shrink-0">{formatRelativeTime(lastMessage.createdAt)}</span>}
         </div>
         <p className={cn('text-xs truncate mt-0.5', unread ? 'text-fg font-medium' : 'text-fg-muted')}>
@@ -124,6 +160,21 @@ function ToggleSwitch({ on }: { on: boolean }) {
 }
 
 function DetailsPanel({
+  conversation,
+  otherUser,
+  onClose,
+}: {
+  conversation: Conversation
+  otherUser?: User
+  onClose: () => void
+}) {
+  if (conversation.type === 'GROUP') {
+    return <GroupDetailsPanel conversation={conversation} onClose={onClose} />
+  }
+  return <DirectDetailsPanel conversation={conversation} otherUser={otherUser!} onClose={onClose} />
+}
+
+function DirectDetailsPanel({
   conversation,
   otherUser,
   onClose,
@@ -321,11 +372,335 @@ function DetailsPanel({
 )
 }
 
+function GroupMemberRow({ conversation, userId, role }: { conversation: Conversation; userId: string; role: string }) {
+  const { data: user } = useUser(userId)
+  const queryClient = useQueryClient()
+  const myId = getCurrentUserId()
+  const isMe = userId === myId
+  const iAmAdmin = conversation.group?.myRole === 'ADMIN'
+
+  const roleMutation = useMutation({
+    mutationFn: (newRole: 'ADMIN' | 'MEMBER') => messagesService.updateGroupRole(conversation.id, userId, newRole),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      toast.success('Role updated')
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not update role'),
+  })
+
+  const removeMutation = useMutation({
+    mutationFn: () => messagesService.removeGroupMember(conversation.id, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      toast.success(user ? `Removed ${user.name}` : 'Member removed')
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not remove member'),
+  })
+
+  if (!user) return <Skeleton className="h-10 w-full rounded-lg" />
+
+  return (
+    <div className="flex items-center gap-2.5 py-1.5">
+      <Link to={`/people/${user.id}`} className="flex items-center gap-2.5 min-w-0 flex-1 hover:opacity-80">
+        <Avatar src={user.avatarUrl} name={user.name} size="sm" />
+        <span className="text-sm text-fg truncate">
+          {user.name}
+          {isMe && ' (You)'}
+        </span>
+        {role === 'ADMIN' && <Crown className="size-3.5 text-amber-500 shrink-0" />}
+      </Link>
+      {iAmAdmin && !isMe && (
+        <DropdownMenu
+          align="right"
+          trigger={
+            <button className="flex size-7 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors">
+              <MoreHorizontal className="size-4" />
+            </button>
+          }
+        >
+          <DropdownItem onClick={() => roleMutation.mutate(role === 'ADMIN' ? 'MEMBER' : 'ADMIN')}>
+            {role === 'ADMIN' ? 'Remove as admin' : 'Make admin'}
+          </DropdownItem>
+          <DropdownItem danger icon={<Trash2 className="size-4" />} onClick={() => removeMutation.mutate()}>
+            Remove from group
+          </DropdownItem>
+        </DropdownMenu>
+      )}
+    </div>
+  )
+}
+
+function AddGroupMembersModal({ conversation, open, onClose }: { conversation: Conversation; open: boolean; onClose: () => void }) {
+  const queryClient = useQueryClient()
+  const myId = getCurrentUserId() ?? ''
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+
+  const { data: connections, isLoading } = useQuery({
+    queryKey: ['user-connections', myId],
+    queryFn: () => usersService.listUserConnections(myId),
+    enabled: open,
+  })
+
+  const candidates = (connections ?? []).filter((c) => !conversation.participantIds.includes(c.id))
+
+  const addMutation = useMutation({
+    mutationFn: () => messagesService.addGroupMembers(conversation.id, [...selectedIds]),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      toast.success('Members added')
+      setSelectedIds(new Set())
+      onClose()
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not add members'),
+  })
+
+  function toggle(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  return (
+    <Modal open={open} onClose={onClose} title="Add members" size="sm">
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1.5 max-h-[45vh] overflow-y-auto">
+          {isLoading ? (
+            <Skeleton className="h-10 w-full rounded-lg" />
+          ) : candidates.length === 0 ? (
+            <p className="text-sm text-fg-muted text-center py-4">Everyone in your connections is already in this group.</p>
+          ) : (
+            candidates.map((user) => {
+              const selected = selectedIds.has(user.id)
+              return (
+                <button
+                  key={user.id}
+                  type="button"
+                  onClick={() => toggle(user.id)}
+                  className={cn(
+                    'flex items-center gap-2.5 p-2 rounded-lg border text-left cursor-pointer transition-all',
+                    selected ? 'border-brand-500 bg-brand-500/5' : 'border-border/70 hover:border-border-strong',
+                  )}
+                >
+                  <Avatar src={user.avatarUrl} name={user.name} size="sm" />
+                  <span className="text-sm text-fg truncate flex-1">{user.name}</span>
+                  {selected && <Check className="size-4 text-brand-600 shrink-0" />}
+                </button>
+              )
+            })
+          )}
+        </div>
+        <div className="flex justify-end gap-2 pt-2 border-t border-border/70">
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button size="sm" disabled={selectedIds.size === 0} isLoading={addMutation.isPending} onClick={() => addMutation.mutate()}>
+            Add
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+function GroupDetailsPanel({ conversation, onClose }: { conversation: Conversation; onClose: () => void }) {
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
+  const group = conversation.group!
+  const iAmAdmin = group.myRole === 'ADMIN'
+  const [nameDraft, setNameDraft] = useState(group.name)
+  const [editingName, setEditingName] = useState(false)
+  const [showAddMembers, setShowAddMembers] = useState(false)
+  const [showLeaveModal, setShowLeaveModal] = useState(false)
+  const avatarInputRef = useRef<HTMLInputElement>(null)
+
+  const renameMutation = useMutation({
+    mutationFn: () => messagesService.renameGroup(conversation.id, nameDraft),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      setEditingName(false)
+      toast.success('Group renamed')
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not rename group'),
+  })
+
+  const avatarMutation = useMutation({
+    mutationFn: (file: File) => messagesService.setGroupAvatar(conversation.id, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      toast.success('Group photo updated')
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not update group photo'),
+  })
+
+  const leaveMutation = useMutation({
+    mutationFn: () => messagesService.leaveGroup(conversation.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+      navigate('/messages', { replace: true })
+      toast.success('Left group')
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not leave group'),
+  })
+
+  return (
+    <>
+      <div
+        className="fixed inset-0 z-40 bg-black/40 backdrop-blur-xs lg:hidden animate-in fade-in duration-200"
+        onClick={onClose}
+        aria-hidden="true"
+      />
+      <div className="fixed inset-y-0 right-0 z-50 w-[300px] max-w-[85vw] bg-surface border-l border-border/80 shadow-2xl flex flex-col overflow-y-auto lg:static lg:z-auto lg:w-[280px] lg:shadow-none lg:border-border-subtle animate-in slide-in-from-right duration-200">
+        <div className="flex items-center justify-between px-4 py-3.5 border-b border-border-subtle">
+          <p className="font-semibold text-fg text-sm">Group info</p>
+          <button
+            onClick={onClose}
+            className="flex size-8 items-center justify-center rounded-lg text-fg-muted hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
+            aria-label="Close details"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        <div className="flex flex-col items-center gap-2.5 px-4 py-5 border-b border-border-subtle">
+          <button
+            type="button"
+            onClick={() => iAmAdmin && avatarInputRef.current?.click()}
+            className={cn('relative', iAmAdmin && 'cursor-pointer group')}
+            disabled={!iAmAdmin}
+          >
+            <GroupAvatar conversation={conversation} />
+            {iAmAdmin && (
+              <span className="absolute inset-0 flex items-center justify-center rounded-full bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity">
+                <Pencil className="size-3.5 text-white" />
+              </span>
+            )}
+          </button>
+          <input
+            ref={avatarInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0]
+              if (file) avatarMutation.mutate(file)
+              e.target.value = ''
+            }}
+          />
+          {editingName ? (
+            <div className="flex gap-2 w-full">
+              <input
+                value={nameDraft}
+                onChange={(e) => setNameDraft(e.target.value)}
+                className="flex-1 min-w-0 rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm outline-none focus:border-brand-500"
+                autoFocus
+              />
+              <Button size="sm" isLoading={renameMutation.isPending} onClick={() => renameMutation.mutate()}>
+                Save
+              </Button>
+            </div>
+          ) : (
+            <button
+              onClick={() => iAmAdmin && setEditingName(true)}
+              className={cn('flex items-center gap-1.5', iAmAdmin && 'cursor-pointer hover:opacity-80')}
+            >
+              <p className="font-bold text-fg text-base">{group.name}</p>
+              {iAmAdmin && <Pencil className="size-3.5 text-fg-muted" />}
+            </button>
+          )}
+          <p className="text-xs text-fg-muted">{group.participants.length} members</p>
+        </div>
+
+        <div className="px-4 py-3.5 border-b border-border-subtle">
+          <div className="flex items-center justify-between mb-2.5">
+            <p className="text-xs font-semibold text-fg-muted">Members</p>
+            {iAmAdmin && (
+              <button
+                onClick={() => setShowAddMembers(true)}
+                className="flex items-center gap-1 text-xs font-semibold text-brand-600 hover:text-brand-700 cursor-pointer"
+              >
+                <UserPlus className="size-3.5" /> Add
+              </button>
+            )}
+          </div>
+          <div className="flex flex-col gap-0.5">
+            {group.participants.map((p) => (
+              <GroupMemberRow key={p.userId} conversation={conversation} userId={p.userId} role={p.role} />
+            ))}
+          </div>
+        </div>
+
+        <button
+          onClick={() => setShowLeaveModal(true)}
+          className="flex items-center gap-2.5 px-4 py-3.5 text-sm text-danger-500 hover:bg-surface-hover cursor-pointer text-left"
+        >
+          <LogOut className="size-4" /> Leave group
+        </button>
+      </div>
+
+      <AddGroupMembersModal conversation={conversation} open={showAddMembers} onClose={() => setShowAddMembers(false)} />
+
+      <Modal open={showLeaveModal} onClose={() => setShowLeaveModal(false)} size="sm">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-danger-50 dark:bg-danger-950/40 text-danger-600 dark:text-danger-400 border border-danger-200/60 dark:border-danger-800/40 shrink-0">
+              <LogOut className="size-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-fg">Leave "{group.name}"?</h3>
+              <p className="text-xs text-fg-muted mt-0.5">You'll need to be added back to rejoin.</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/70">
+            <Button variant="secondary" size="sm" onClick={() => setShowLeaveModal(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" size="sm" isLoading={leaveMutation.isPending} onClick={() => leaveMutation.mutate()}>
+              Leave group
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </>
+  )
+}
+
+function MessageSenderAvatar({ senderId, isGroup, otherUser }: { senderId: string; isGroup: boolean; otherUser?: User }) {
+  const { data: groupSender } = useUser(isGroup ? senderId : undefined)
+  const user = isGroup ? groupSender : otherUser
+  return <Avatar src={user?.avatarUrl} name={user?.name ?? ''} size="xs" />
+}
+
+function GroupSenderLabel({ senderId }: { senderId: string }) {
+  const { data: user } = useUser(senderId)
+  if (!user) return null
+  return <p className="text-[11px] font-semibold text-fg-muted mb-0.5 ml-8">{user.name}</p>
+}
+
+function ReplyPreviewStrip({ replyTo, isOwn }: { replyTo: Message['replyTo']; isOwn: boolean }) {
+  const { data: sender } = useUser(replyTo?.senderId)
+  if (!replyTo) return null
+  return (
+    <div
+      className={cn(
+        'rounded-lg px-2.5 py-1.5 text-xs mb-1 border-l-2 max-w-full',
+        isOwn ? 'bg-white/10 border-white/40 text-white/90' : 'bg-surface border-brand-400 text-fg-muted',
+      )}
+    >
+      <p className="font-semibold truncate">{sender?.name ?? '…'}</p>
+      <p className="truncate opacity-80">{replyTo.type === 'SHARED_POST' ? 'Shared a post' : replyTo.contentSnippet}</p>
+    </div>
+  )
+}
+
 function ChatPanel({ conversationId }: { conversationId: string }) {
   const navigate = useNavigate()
   const { data: conversations } = useConversations()
   const currentConversation = conversations?.find((c) => c.id === conversationId)
-  const otherUserId = currentConversation?.participantIds.find((p) => p !== getCurrentUserId())
+  const isGroup = currentConversation?.type === 'GROUP'
+  const otherUserId = isGroup ? undefined : currentConversation?.participantIds.find((p) => p !== getCurrentUserId())
   const { data: otherUser } = useUser(otherUserId)
   const { data: messages, isLoading } = useMessages(conversationId)
   const sendMutation = useSendMessage(conversationId)
@@ -337,6 +712,7 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
   const [selectMode, setSelectMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [deleteTarget, setDeleteTarget] = useState<string[] | null>(null)
+  const [replyingTo, setReplyingTo] = useState<Message | null>(null)
   const myId = getCurrentUserId()
 
   function toggleSelected(messageId: string) {
@@ -374,6 +750,7 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
 
   useEffect(() => {
     markRead()
+    setReplyingTo(null)
   }, [conversationId, markRead])
 
   function handleScroll() {
@@ -399,8 +776,9 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
   function handleSend(e: FormEvent) {
     e.preventDefault()
     if (!draft.trim()) return
-    sendMutation.mutate(draft.trim())
+    sendMutation.mutate({ content: draft.trim(), replyToMessageId: replyingTo?.id })
     setDraft('')
+    setReplyingTo(null)
   }
 
   const groups = messages ? groupMessages(messages) : []
@@ -441,11 +819,18 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                 >
                   <ArrowLeft className="size-5" />
                 </button>
-                {otherUser && (
-                  <Link to={`/people/${otherUser.id}`} className="flex items-center gap-2.5 min-w-0 hover:opacity-80 transition-opacity">
-                    <Avatar src={otherUser.avatarUrl} name={otherUser.name} size="sm" />
-                    <p className="font-bold text-fg text-sm truncate">{currentConversation?.nickname || otherUser.name}</p>
-                  </Link>
+                {isGroup && currentConversation ? (
+                  <button onClick={() => setDetailsOpen(true)} className="flex items-center gap-2.5 min-w-0 hover:opacity-80 transition-opacity cursor-pointer">
+                    <GroupAvatar conversation={currentConversation} size="sm" />
+                    <p className="font-bold text-fg text-sm truncate">{groupDisplayName(currentConversation)}</p>
+                  </button>
+                ) : (
+                  otherUser && (
+                    <Link to={`/people/${otherUser.id}`} className="flex items-center gap-2.5 min-w-0 hover:opacity-80 transition-opacity">
+                      <Avatar src={otherUser.avatarUrl} name={otherUser.name} size="sm" />
+                      <p className="font-bold text-fg text-sm truncate">{currentConversation?.nickname || otherUser.name}</p>
+                    </Link>
+                  )
                 )}
               </div>
               <div className="flex items-center gap-1 shrink-0">
@@ -482,11 +867,14 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
             {isLoading ? (
               <Skeleton className="h-10 w-2/3 rounded-lg" />
             ) : (
-              groups.map((group, gi) => (
+              groups.map((group, gi) => {
+                const groupIsOwn = group.senderId === myId
+                return (
                 <div key={gi} className="flex flex-col gap-0.5 mb-3">
                   <div className="flex justify-center mb-2">
                     <span className="text-[11px] text-fg-muted font-medium">{formatDateTime(group.messages[0].createdAt)}</span>
                   </div>
+                  {isGroup && !groupIsOwn && <GroupSenderLabel senderId={group.senderId} />}
                   {group.messages.map((msg, mi) => {
                     const isOwn = msg.senderId === myId
                     const isLast = mi === group.messages.length - 1
@@ -497,7 +885,7 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                       <div key={msg.id} className={cn('group flex items-end gap-1.5', isOwn ? 'self-end flex-row-reverse' : 'self-start')}>
                         {!isOwn &&
                           (isLast ? (
-                            <Avatar src={otherUser?.avatarUrl} name={otherUser?.name ?? ''} size="xs" />
+                            <MessageSenderAvatar senderId={msg.senderId} isGroup={!!isGroup} otherUser={otherUser} />
                           ) : (
                             <span className="size-6 shrink-0" />
                           ))}
@@ -527,6 +915,7 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                                     isOwn ? 'bg-brand-600 text-white rounded-br-sm' : 'bg-surface-sunken text-fg rounded-bl-sm border border-border/60',
                                   )}
                                 >
+                                  {msg.replyTo && <ReplyPreviewStrip replyTo={msg.replyTo} isOwn={isOwn} />}
                                   {msg.content}
                                 </div>
                               )}
@@ -544,6 +933,9 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                                   </button>
                                 }
                               >
+                                <DropdownItem icon={<Reply className="size-4" />} onClick={() => setReplyingTo(msg)}>
+                                  Reply
+                                </DropdownItem>
                                 <DropdownItem danger icon={<Trash2 className="size-4" />} onClick={() => setDeleteTarget([msg.id])}>
                                   Delete for me
                                 </DropdownItem>
@@ -558,6 +950,7 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                                 isOwn ? 'bg-brand-600 text-white rounded-br-sm shadow-2xs' : 'bg-surface-sunken text-fg rounded-bl-sm border border-border/60',
                               )}
                             >
+                              {msg.replyTo && <ReplyPreviewStrip replyTo={msg.replyTo} isOwn={isOwn} />}
                               {msg.content}
                             </div>
                             {!selectMode && (
@@ -573,6 +966,9 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                                   </button>
                                 }
                               >
+                                <DropdownItem icon={<Reply className="size-4" />} onClick={() => setReplyingTo(msg)}>
+                                  Reply
+                                </DropdownItem>
                                 <DropdownItem danger icon={<Trash2 className="size-4" />} onClick={() => setDeleteTarget([msg.id])}>
                                   Delete for me
                                 </DropdownItem>
@@ -584,7 +980,8 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                     )
                   })}
                 </div>
-              ))
+                )
+              })
             )}
             <div ref={bottomRef} />
           </div>
@@ -595,26 +992,46 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
             You can't reply to this conversation
           </div>
         ) : (
-          <form onSubmit={handleSend} className="flex items-center gap-2 px-4 py-3 border-t border-border/70 bg-surface">
-            <input
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder="Write a message…"
-              className="flex-1 rounded-full border border-border bg-surface-sunken/70 px-4 py-2.5 text-sm text-fg outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-fg-muted"
-            />
-            <button
-              type="submit"
-              disabled={!draft.trim()}
-              aria-label="Send message"
-              className="flex size-10 items-center justify-center rounded-full bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-40 cursor-pointer shrink-0 transition-all active:scale-95 shadow-xs"
-            >
-              <Send className="size-4" />
-            </button>
-          </form>
+          <div className="border-t border-border/70 bg-surface">
+            {replyingTo && (
+              <div className="flex items-center justify-between gap-2 px-4 pt-2.5 text-xs">
+                <div className="flex-1 min-w-0 rounded-lg bg-surface-sunken border-l-2 border-brand-500 px-2.5 py-1.5">
+                  <p className="font-semibold text-fg">Replying to {replyingTo.senderId === myId ? 'yourself' : 'message'}</p>
+                  <p className="text-fg-muted truncate">
+                    {replyingTo.type === 'SHARED_POST' ? 'Shared a post' : replyingTo.content}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setReplyingTo(null)}
+                  className="text-fg-muted hover:text-fg cursor-pointer shrink-0"
+                  aria-label="Cancel reply"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+            )}
+            <form onSubmit={handleSend} className="flex items-center gap-2 px-4 py-3">
+              <input
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="Write a message…"
+                className="flex-1 rounded-full border border-border bg-surface-sunken/70 px-4 py-2.5 text-sm text-fg outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-fg-muted"
+              />
+              <button
+                type="submit"
+                disabled={!draft.trim()}
+                aria-label="Send message"
+                className="flex size-10 items-center justify-center rounded-full bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-40 cursor-pointer shrink-0 transition-all active:scale-95 shadow-xs"
+              >
+                <Send className="size-4" />
+              </button>
+            </form>
+          </div>
         )}
       </div>
 
-      {detailsOpen && currentConversation && otherUser && (
+      {detailsOpen && currentConversation && (isGroup || otherUser) && (
         <DetailsPanel conversation={currentConversation} otherUser={otherUser} onClose={() => setDetailsOpen(false)} />
       )}
 
@@ -632,7 +1049,7 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
             </div>
           </div>
           <p className="text-sm text-fg-muted leading-relaxed">
-            This can't be undone. It only removes {deleteTarget && deleteTarget.length > 1 ? 'these messages' : 'this message'} from your own view — {otherUser?.name ?? 'the other person'} will still see {deleteTarget && deleteTarget.length > 1 ? 'them' : 'it'} normally.
+            This can't be undone. It only removes {deleteTarget && deleteTarget.length > 1 ? 'these messages' : 'this message'} from your own view — {isGroup ? 'everyone else' : (otherUser?.name ?? 'the other person')} will still see {deleteTarget && deleteTarget.length > 1 ? 'them' : 'it'} normally.
           </p>
           <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/70">
             <Button variant="secondary" size="sm" onClick={() => setDeleteTarget(null)}>
@@ -657,6 +1074,7 @@ export default function MessagesPage() {
   const { conversationId } = useParams<{ conversationId?: string }>()
   const navigate = useNavigate()
   const { data: conversations, isLoading, refetch } = useConversations()
+  const [showCreateGroup, setShowCreateGroup] = useState(false)
 
   useEffect(() => {
     // Only auto-select a conversation on wider desktop screens (>= 640px)
@@ -691,6 +1109,12 @@ export default function MessagesPage() {
       >
         <div className="flex items-center justify-between px-2 py-2 mb-1">
           <h1 className="text-lg font-bold text-fg tracking-tight">Messages</h1>
+          <button
+            onClick={() => setShowCreateGroup(true)}
+            className="flex items-center gap-1.5 text-xs font-semibold text-brand-600 hover:text-brand-700 cursor-pointer"
+          >
+            <Users className="size-3.5" /> New group
+          </button>
         </div>
         {isLoading ? (
           <div className="flex flex-col gap-2 p-1">
@@ -728,6 +1152,8 @@ export default function MessagesPage() {
           </div>
         )}
       </div>
+
+      <CreateGroupModal open={showCreateGroup} onClose={() => setShowCreateGroup(false)} />
     </div>
   )
 }
