@@ -24,6 +24,7 @@ import {
 } from 'lucide-react'
 import { useConversations, useMessages, useSendMessage, useMarkConversationRead, useHideMessagesForMe } from '@/hooks/useConversations'
 import { useUser } from '@/hooks/useUser'
+import { useSwipeToReply } from '@/hooks/useSwipeToReply'
 import { getCurrentUserId } from '@/services/users.service'
 import * as usersService from '@/services/users.service'
 import * as messagesService from '@/services/messages.service'
@@ -683,29 +684,259 @@ function GroupSenderLabel({ senderId }: { senderId: string }) {
 function ReplyPreviewStrip({
   replyTo,
   isOwn,
+  replySenderId,
+  currentUserId,
   onJumpToMessage,
 }: {
   replyTo: Message['replyTo']
   isOwn: boolean
+  replySenderId: string
+  currentUserId: string | undefined
   onJumpToMessage: (messageId: string) => void
 }) {
-  const { data: sender } = useUser(replyTo?.senderId)
+  const { data: originalSender } = useUser(replyTo?.senderId)
+  // Only needed to name a THIRD party in a group thread — for isOwn it's "You", and for a
+  // direct chat the reply can only ever be from the one other participant already on screen.
+  const needsReplySenderName = !isOwn && replyTo?.senderId === currentUserId
+  const { data: replySender } = useUser(needsReplySenderName ? replySenderId : undefined)
   if (!replyTo) return null
+
+  const originalIsMe = replyTo.senderId === currentUserId
+  const relationshipLabel = isOwn
+    ? `You replied to ${originalIsMe ? 'yourself' : (originalSender?.name ?? '…')}`
+    : originalIsMe
+      ? `${replySender?.name ?? 'They'} replied to you`
+      : `${originalSender?.name ?? 'They'} was quoted`
+
   return (
     <button
       type="button"
       onClick={() => onJumpToMessage(replyTo.id)}
-      aria-label={`Jump to original message from ${sender?.name ?? 'this person'}`}
+      aria-label={`Jump to original message from ${originalSender?.name ?? 'this person'}`}
       className={cn(
         'flex flex-col w-full min-w-0 text-left rounded-md pl-2 pr-2.5 py-1 mb-1.5 border-l-2 max-w-full cursor-pointer transition-colors',
         isOwn ? 'bg-black/10 border-white/50 hover:bg-black/15' : 'bg-fg/5 border-brand-400 hover:bg-fg/10',
       )}
     >
-      <p className={cn('text-[11px] font-semibold truncate', isOwn ? 'text-white/90' : 'text-brand-600')}>{sender?.name ?? '…'}</p>
-      <p className={cn('text-xs truncate', isOwn ? 'text-white/70' : 'text-fg-muted')}>
-        {replyTo.type === 'SHARED_POST' ? 'Shared a post' : replyTo.contentSnippet}
+      <p className={cn('text-[10px] font-medium truncate opacity-75', isOwn ? 'text-white/90' : 'text-fg-muted')}>{relationshipLabel}</p>
+      <p className={cn('text-xs truncate', isOwn ? 'text-white/85' : 'text-fg')}>
+        {replyTo.type === 'SHARED_POST' ? '📷 Shared a post' : replyTo.contentSnippet}
       </p>
     </button>
+  )
+}
+
+function MessageRow({
+  msg,
+  isOwn,
+  isLast,
+  isGroup,
+  otherUser,
+  selectMode,
+  isSelected,
+  conversationId,
+  myId,
+  highlightedMessageId,
+  registerRef,
+  onToggleSelected,
+  onReply,
+  onDelete,
+  onJumpToMessage,
+}: {
+  msg: Message
+  isOwn: boolean
+  isLast: boolean
+  isGroup: boolean
+  otherUser?: User
+  selectMode: boolean
+  isSelected: boolean
+  conversationId: string
+  myId: string | undefined
+  highlightedMessageId: string | null
+  registerRef: (el: HTMLDivElement | null) => void
+  onToggleSelected: (messageId: string) => void
+  onReply: () => void
+  onDelete: () => void
+  onJumpToMessage: (messageId: string) => void
+}) {
+  // Swipe is a mobile-only affordance in practice: without a touchscreen no touchstart ever
+  // fires, so this is fully inert on desktop and the existing hover/dropdown reply path is
+  // untouched. Disabled during select-mode so a drag can't fight message multi-select.
+  const {
+    ref: swipeRef,
+    revealWidth,
+    revealOpacity,
+    isDragging,
+  } = useSwipeToReply<HTMLDivElement>({ onTriggered: onReply, enabled: !selectMode })
+
+  const replyRevealIcon = (
+    <div
+      className="shrink-0 overflow-hidden flex items-center justify-center"
+      style={{
+        width: revealWidth,
+        opacity: revealOpacity,
+        transition: isDragging ? 'none' : 'width 200ms ease-out, opacity 200ms ease-out',
+      }}
+    >
+      <Reply className="size-3.5 text-brand-500 shrink-0" />
+    </div>
+  )
+
+  const messageOptionsMenu = !selectMode && (
+    <DropdownMenu
+      align={isOwn ? 'right' : 'left'}
+      className="min-w-[150px]"
+      trigger={
+        <button
+          type="button"
+          className="flex size-7 items-center justify-center rounded-lg text-fg-muted/70 hover:text-fg hover:bg-surface-hover cursor-pointer transition-all opacity-0 group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-40 hover:!opacity-100"
+          aria-label="Message options"
+        >
+          <MoreHorizontal className="size-4" />
+        </button>
+      }
+    >
+      <DropdownItem icon={<Reply className="size-4" />} onClick={onReply}>
+        Reply
+      </DropdownItem>
+      <DropdownItem danger icon={<Trash2 className="size-4" />} onClick={onDelete}>
+        Delete for me
+      </DropdownItem>
+    </DropdownMenu>
+  )
+
+  return (
+    <div
+      ref={(el) => {
+        registerRef(el)
+        swipeRef.current = el
+      }}
+      data-message-id={msg.id}
+      // A definite w-full row is what lets the max-w-[70%] below resolve against the chat
+      // column's real width — nesting it straight inside a shrink-to-fit flex item instead
+      // makes the browser size that ancestor to exactly the bubble's own content, so "70% of
+      // it" clips below the content's natural size and every message wraps far too early.
+      // touch-pan-y hints the browser to keep native vertical scrolling; the swipe hook only
+      // ever calls preventDefault once a gesture is confirmed horizontal.
+      className={cn('flex w-full touch-pan-y', isOwn ? 'justify-end' : 'justify-start')}
+    >
+      <div className={cn('group flex items-end gap-1.5 max-w-[85%] sm:max-w-[70%]', isOwn && 'flex-row-reverse')}>
+        {!isOwn &&
+          (isLast ? (
+            <MessageSenderAvatar senderId={msg.senderId} isGroup={isGroup} otherUser={otherUser} />
+          ) : (
+            <span className="size-6 shrink-0" />
+          ))}
+
+        {selectMode && (
+          <button
+            type="button"
+            onClick={() => onToggleSelected(msg.id)}
+            aria-label={isSelected ? 'Deselect message' : 'Select message'}
+            className={cn(
+              'flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors cursor-pointer',
+              isSelected ? 'bg-brand-600 border-brand-600 text-white' : 'border-border-strong hover:border-brand-500',
+            )}
+          >
+            {isSelected && <Check className="size-3" />}
+          </button>
+        )}
+
+        {msg.type === 'SHARED_POST' ? (
+          <>
+            {/* iconSlot + content share one never-reversed inner row, so growing the icon
+                always pushes THIS content right — a direct sibling of the reversed outer
+                row would instead push whatever comes after it (the options button) on an
+                own-message, leaving the bubble itself looking like it never moved. */}
+            <div className="flex items-end">
+              {replyRevealIcon}
+              <div
+                className={cn(
+                  'flex flex-col gap-1.5 min-w-0 transition-shadow duration-500 rounded-xl',
+                  isOwn && 'items-end',
+                  highlightedMessageId === msg.id && 'ring-2 ring-brand-500',
+                )}
+              >
+                <SharedPostPreview message={msg} conversationId={conversationId} />
+                {msg.content && (
+                  <div
+                    className={cn(
+                      'w-fit max-w-full rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words',
+                      isOwn ? 'bg-brand-600 text-white rounded-br-sm' : 'bg-surface-sunken text-fg rounded-bl-sm border border-border/60',
+                    )}
+                  >
+                    {msg.replyTo && (
+                      <ReplyPreviewStrip
+                        replyTo={msg.replyTo}
+                        isOwn={isOwn}
+                        replySenderId={msg.senderId}
+                        currentUserId={myId}
+                        onJumpToMessage={onJumpToMessage}
+                      />
+                    )}
+                    {msg.content}
+                  </div>
+                )}
+              </div>
+            </div>
+            {messageOptionsMenu}
+          </>
+        ) : (
+          <>
+            <div className="flex items-end">
+              {replyRevealIcon}
+              <div
+                className={cn(
+                  'w-fit min-w-0 max-w-full rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words transition-shadow duration-500',
+                  isOwn ? 'bg-brand-600 text-white rounded-br-sm shadow-2xs' : 'bg-surface-sunken text-fg rounded-bl-sm border border-border/60',
+                  highlightedMessageId === msg.id && 'ring-2 ring-brand-500',
+                )}
+              >
+                {msg.replyTo && (
+                  <ReplyPreviewStrip
+                    replyTo={msg.replyTo}
+                    isOwn={isOwn}
+                    replySenderId={msg.senderId}
+                    currentUserId={myId}
+                    onJumpToMessage={onJumpToMessage}
+                  />
+                )}
+                {msg.content}
+              </div>
+            </div>
+            {messageOptionsMenu}
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function ComposerReplyPreview({
+  replyingTo,
+  myId,
+  onCancel,
+}: {
+  replyingTo: Message
+  myId: string | undefined
+  onCancel: () => void
+}) {
+  const isOwn = replyingTo.senderId === myId
+  const { data: sender } = useUser(isOwn ? undefined : replyingTo.senderId)
+  const label = isOwn ? 'yourself' : (sender?.name ?? '…')
+  return (
+    <div className="flex items-center justify-between gap-2 px-4 pt-2.5 text-xs">
+      <div className="flex-1 min-w-0 flex items-start gap-1.5 rounded-lg bg-surface-sunken border-l-2 border-brand-500 px-2.5 py-1.5">
+        <Reply className="size-3.5 text-brand-500 shrink-0 mt-0.5" />
+        <div className="min-w-0">
+          <p className="font-semibold text-fg truncate">Replying to {label}</p>
+          <p className="text-fg-muted truncate">{replyingTo.type === 'SHARED_POST' ? '📷 Shared a post' : replyingTo.content}</p>
+        </div>
+      </div>
+      <button type="button" onClick={onCancel} className="text-fg-muted hover:text-fg cursor-pointer shrink-0" aria-label="Cancel reply">
+        <X className="size-4" />
+      </button>
+    </div>
   )
 }
 
@@ -911,122 +1142,27 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                     // available on every message — including ones sent by the other participant.
                     const isSelected = selectedIds.has(msg.id)
                     return (
-                      <div
+                      <MessageRow
                         key={msg.id}
-                        ref={(el) => {
+                        msg={msg}
+                        isOwn={isOwn}
+                        isLast={isLast}
+                        isGroup={!!isGroup}
+                        otherUser={otherUser}
+                        selectMode={selectMode}
+                        isSelected={isSelected}
+                        conversationId={conversationId}
+                        myId={myId}
+                        highlightedMessageId={highlightedMessageId}
+                        registerRef={(el) => {
                           if (el) messageRowRefs.current.set(msg.id, el)
                           else messageRowRefs.current.delete(msg.id)
                         }}
-                        // A definite w-full row is what lets the max-w-[70%] below resolve against
-                        // the chat column's real width — nesting it straight inside a shrink-to-fit
-                        // flex item instead (as this used to) makes the browser size that ancestor to
-                        // exactly the bubble's own content, so "70% of it" clips below the content's
-                        // natural size and every message wraps far earlier than it needs to.
-                        className={cn('flex w-full', isOwn ? 'justify-end' : 'justify-start')}
-                      >
-                        <div className={cn('group flex items-end gap-1.5 max-w-[85%] sm:max-w-[70%]', isOwn && 'flex-row-reverse')}>
-                          {!isOwn &&
-                            (isLast ? (
-                              <MessageSenderAvatar senderId={msg.senderId} isGroup={!!isGroup} otherUser={otherUser} />
-                            ) : (
-                              <span className="size-6 shrink-0" />
-                            ))}
-
-                          {selectMode && (
-                            <button
-                              type="button"
-                              onClick={() => toggleSelected(msg.id)}
-                              aria-label={isSelected ? 'Deselect message' : 'Select message'}
-                              className={cn(
-                                'flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors cursor-pointer',
-                                isSelected ? 'bg-brand-600 border-brand-600 text-white' : 'border-border-strong hover:border-brand-500',
-                              )}
-                            >
-                              {isSelected && <Check className="size-3" />}
-                            </button>
-                          )}
-
-                          {msg.type === 'SHARED_POST' ? (
-                            <>
-                              <div
-                                className={cn(
-                                  'flex flex-col gap-1.5 min-w-0 transition-shadow duration-500 rounded-xl',
-                                  isOwn && 'items-end',
-                                  highlightedMessageId === msg.id && 'ring-2 ring-brand-500',
-                                )}
-                              >
-                                <SharedPostPreview message={msg} conversationId={conversationId} />
-                                {msg.content && (
-                                  <div
-                                    className={cn(
-                                      'w-fit max-w-full rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words',
-                                      isOwn ? 'bg-brand-600 text-white rounded-br-sm' : 'bg-surface-sunken text-fg rounded-bl-sm border border-border/60',
-                                    )}
-                                  >
-                                    {msg.replyTo && <ReplyPreviewStrip replyTo={msg.replyTo} isOwn={isOwn} onJumpToMessage={jumpToMessage} />}
-                                    {msg.content}
-                                  </div>
-                                )}
-                              </div>
-                              {!selectMode && (
-                                <DropdownMenu
-                                  align={isOwn ? 'right' : 'left'}
-                                  trigger={
-                                    <button
-                                      type="button"
-                                      className="flex size-7 items-center justify-center rounded-lg text-fg-muted/70 hover:text-fg hover:bg-surface-hover cursor-pointer transition-all opacity-0 group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-40 hover:!opacity-100"
-                                      aria-label="Message options"
-                                    >
-                                      <MoreHorizontal className="size-4" />
-                                    </button>
-                                  }
-                                >
-                                  <DropdownItem icon={<Reply className="size-4" />} onClick={() => setReplyingTo(msg)}>
-                                    Reply
-                                  </DropdownItem>
-                                  <DropdownItem danger icon={<Trash2 className="size-4" />} onClick={() => setDeleteTarget([msg.id])}>
-                                    Delete for me
-                                  </DropdownItem>
-                                </DropdownMenu>
-                              )}
-                            </>
-                          ) : (
-                            <>
-                              <div
-                                className={cn(
-                                  'w-fit min-w-0 max-w-full rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words transition-shadow duration-500',
-                                  isOwn ? 'bg-brand-600 text-white rounded-br-sm shadow-2xs' : 'bg-surface-sunken text-fg rounded-bl-sm border border-border/60',
-                                  highlightedMessageId === msg.id && 'ring-2 ring-brand-500',
-                                )}
-                              >
-                                {msg.replyTo && <ReplyPreviewStrip replyTo={msg.replyTo} isOwn={isOwn} onJumpToMessage={jumpToMessage} />}
-                                {msg.content}
-                              </div>
-                              {!selectMode && (
-                                <DropdownMenu
-                                  align={isOwn ? 'right' : 'left'}
-                                  trigger={
-                                    <button
-                                      type="button"
-                                      className="flex size-7 items-center justify-center rounded-lg text-fg-muted/70 hover:text-fg hover:bg-surface-hover cursor-pointer transition-all opacity-0 group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-40 hover:!opacity-100"
-                                      aria-label="Message options"
-                                    >
-                                      <MoreHorizontal className="size-4" />
-                                    </button>
-                                  }
-                                >
-                                  <DropdownItem icon={<Reply className="size-4" />} onClick={() => setReplyingTo(msg)}>
-                                    Reply
-                                  </DropdownItem>
-                                  <DropdownItem danger icon={<Trash2 className="size-4" />} onClick={() => setDeleteTarget([msg.id])}>
-                                    Delete for me
-                                  </DropdownItem>
-                                </DropdownMenu>
-                              )}
-                            </>
-                          )}
-                        </div>
-                      </div>
+                        onToggleSelected={toggleSelected}
+                        onReply={() => setReplyingTo(msg)}
+                        onDelete={() => setDeleteTarget([msg.id])}
+                        onJumpToMessage={jumpToMessage}
+                      />
                     )
                   })}
                 </div>
@@ -1043,24 +1179,7 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
           </div>
         ) : (
           <div className="border-t border-border/70 bg-surface">
-            {replyingTo && (
-              <div className="flex items-center justify-between gap-2 px-4 pt-2.5 text-xs">
-                <div className="flex-1 min-w-0 rounded-lg bg-surface-sunken border-l-2 border-brand-500 px-2.5 py-1.5">
-                  <p className="font-semibold text-fg">Replying to {replyingTo.senderId === myId ? 'yourself' : 'message'}</p>
-                  <p className="text-fg-muted truncate">
-                    {replyingTo.type === 'SHARED_POST' ? 'Shared a post' : replyingTo.content}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setReplyingTo(null)}
-                  className="text-fg-muted hover:text-fg cursor-pointer shrink-0"
-                  aria-label="Cancel reply"
-                >
-                  <X className="size-4" />
-                </button>
-              </div>
-            )}
+            {replyingTo && <ComposerReplyPreview replyingTo={replyingTo} myId={myId} onCancel={() => setReplyingTo(null)} />}
             <form onSubmit={handleSend} className="flex items-center gap-2 px-4 py-3">
               <input
                 value={draft}
