@@ -132,11 +132,20 @@ export default function StartupsListPage() {
           <EmptyState
             icon={<Rocket className="size-5" />}
             title="No startup yet"
-            description="Your startup will appear here after you turn an idea into a startup."
+            description="Already building or running something — here or out in the world (think Swiggy, Zomato)? Add it to Nukkad."
             action={
-              <Link to="/ideas/new">
-                <Button size="sm">Post an idea</Button>
-              </Link>
+              <div className="flex flex-col items-center gap-2">
+                <Link to="/startups/new" onClick={() => setExistingStartupOpen(false)}>
+                  <Button size="sm">Register your startup</Button>
+                </Link>
+                <Link
+                  to="/ideas/new"
+                  onClick={() => setExistingStartupOpen(false)}
+                  className="text-xs text-fg-muted hover:text-fg hover:underline"
+                >
+                  Or turn one of your ideas into a startup
+                </Link>
+              </div>
             }
           />
         )}

@@ -73,6 +73,32 @@ export async function listStartups(filters: StartupFilters = {}): Promise<Startu
   return dtos.map(mapStartup)
 }
 
+export interface CreateStartupInput {
+  name: string
+  tagline?: string
+  sector?: string
+  problem?: string
+  solution?: string
+  stage?: StartupStage
+  needs?: string[]
+  chapterId?: string
+}
+
+export async function createStartup(input: CreateStartupInput): Promise<Startup> {
+  return mapStartup(
+    await apiClient.post<StartupDto>('/startups', {
+      name: input.name,
+      tagline: input.tagline || undefined,
+      sector: input.sector || undefined,
+      problem: input.problem || undefined,
+      solution: input.solution || undefined,
+      stage: input.stage,
+      needs: input.needs,
+      chapterId: input.chapterId || undefined,
+    }),
+  )
+}
+
 export async function getStartup(id: string): Promise<Startup | undefined> {
   try {
     return mapStartup(await apiClient.get<StartupDto>(`/startups/${id}`))

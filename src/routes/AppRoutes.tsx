@@ -18,6 +18,7 @@ import IdeasListPage from '@/pages/ideas/IdeasListPage'
 import IdeaDetailPage from '@/pages/ideas/IdeaDetailPage'
 import PostIdeaPage from '@/pages/ideas/PostIdeaPage'
 import StartupsListPage from '@/pages/startups/StartupsListPage'
+import RegisterStartupPage from '@/pages/startups/RegisterStartupPage'
 import StartupDetailPage from '@/pages/startups/StartupDetailPage'
 import OpportunitiesListPage from '@/pages/opportunities/OpportunitiesListPage'
 import OpportunityDetailPage from '@/pages/opportunities/OpportunityDetailPage'
@@ -71,6 +72,7 @@ export function AppRoutes() {
           <Route path="/ideas/:id" element={<IdeaDetailPage />} />
 
           <Route path="/startups" element={<StartupsListPage />} />
+          <Route path="/startups/new" element={<RegisterStartupPage />} />
           <Route path="/startups/:id" element={<StartupDetailPage />} />
 
           <Route path="/opportunities" element={<OpportunitiesListPage />} />
