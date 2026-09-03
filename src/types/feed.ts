@@ -28,7 +28,14 @@ export interface Post {
 export interface PostComment {
   id: string
   postId: string
+  parentCommentId?: string
   authorId: string
   content: string
+  replyCount: number
+  createdAt: string
+}
+
+export interface PostLiker {
+  userId: string
   createdAt: string
 }

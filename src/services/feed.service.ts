@@ -1,5 +1,5 @@
-import { apiClient, getPage, uploadFile } from '@/lib/api-client'
-import type { AttachmentKind, Post, PostAttachment, PostComment, PostType } from '@/types'
+import { apiClient, getPage, uploadFile, type Page } from '@/lib/api-client'
+import type { AttachmentKind, Post, PostAttachment, PostComment, PostLiker, PostType } from '@/types'
 
 interface AttachmentDto {
   id: string
@@ -109,13 +109,23 @@ export async function toggleCommentsDisabled(id: string): Promise<Post> {
 interface CommentDto {
   id: string
   postId: string
+  parentCommentId: string | null
   authorId: string
   content: string
+  replyCount: number
   createdAt: string
 }
 
 function mapComment(dto: CommentDto): PostComment {
-  return { id: dto.id, postId: dto.postId, authorId: dto.authorId, content: dto.content, createdAt: dto.createdAt }
+  return {
+    id: dto.id,
+    postId: dto.postId,
+    parentCommentId: dto.parentCommentId ?? undefined,
+    authorId: dto.authorId,
+    content: dto.content,
+    replyCount: dto.replyCount,
+    createdAt: dto.createdAt,
+  }
 }
 
 export async function listComments(postId: string): Promise<PostComment[]> {
@@ -123,7 +133,20 @@ export async function listComments(postId: string): Promise<PostComment[]> {
   return dtos.map(mapComment)
 }
 
-export async function addComment(postId: string, content: string): Promise<PostComment> {
-  const dto = await apiClient.post<CommentDto>(`/feed/${postId}/comments`, { content })
+export async function listReplies(postId: string, commentId: string): Promise<PostComment[]> {
+  const dtos = await getPage<CommentDto>(`/feed/${postId}/comments/${commentId}/replies`)
+  return dtos.map(mapComment)
+}
+
+export async function addComment(postId: string, content: string, parentCommentId?: string): Promise<PostComment> {
+  const dto = await apiClient.post<CommentDto>(`/feed/${postId}/comments`, { content, parentCommentId })
   return mapComment(dto)
+}
+
+export async function deleteComment(postId: string, commentId: string): Promise<void> {
+  await apiClient.delete<void>(`/feed/${postId}/comments/${commentId}`)
+}
+
+export async function listLikers(postId: string, page = 0, size = 50): Promise<Page<PostLiker>> {
+  return apiClient.get<Page<PostLiker>>(`/feed/${postId}/likes?page=${page}&size=${size}`)
 }

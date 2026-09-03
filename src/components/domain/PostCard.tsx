@@ -21,6 +21,7 @@ import {
   Info,
   Send,
   Bookmark,
+  X,
 } from 'lucide-react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { Post, PostAttachment, PostComment } from '@/types'
@@ -32,6 +33,7 @@ import { Textarea } from '@/components/ui/Input'
 import { Button } from '@/components/ui/Button'
 import { DropdownMenu, DropdownItem, DropdownDivider } from '@/components/ui/DropdownMenu'
 import { ShareModal } from '@/components/domain/ShareModal'
+import { LikesModal } from '@/components/domain/LikesModal'
 import { useUser } from '@/hooks/useUser'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { formatRelativeTime, cn } from '@/lib/utils'
@@ -128,28 +130,103 @@ function AttachmentCarousel({ attachments }: { attachments: PostAttachment[] }) 
   )
 }
 
-function CommentItem({ comment }: { comment: PostComment }) {
+function CommentItem({
+  comment,
+  post,
+  isReply = false,
+  onReply,
+}: {
+  comment: PostComment
+  post: Post
+  isReply?: boolean
+  onReply: (comment: PostComment) => void
+}) {
   const { data: author } = useUser(comment.authorId)
+  const { data: currentUser } = useCurrentUser()
+  const queryClient = useQueryClient()
+  const [repliesOpen, setRepliesOpen] = useState(false)
+
+  const canDelete = !!currentUser && (currentUser.id === comment.authorId || currentUser.id === post.authorId)
+
+  const deleteMutation = useMutation({
+    mutationFn: () => feedService.deleteComment(post.id, comment.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['feed', post.id, 'comments'] })
+      queryClient.invalidateQueries({ queryKey: ['feed'] })
+      toast.success('Comment deleted')
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not delete comment'),
+  })
+
+  const { data: replies, isLoading: repliesLoading } = useQuery({
+    queryKey: ['feed', post.id, 'comments', comment.id, 'replies'],
+    queryFn: () => feedService.listReplies(post.id, comment.id),
+    enabled: repliesOpen,
+  })
+
   return (
-    <div className="flex items-start gap-2.5">
-      {author ? (
-        <Avatar src={author.avatarUrl} name={author.name} size="xs" />
-      ) : (
-        <Skeleton className="size-6 rounded-full shrink-0" />
-      )}
-      <div className="min-w-0 flex-1 rounded-2xl bg-surface-sunken/70 border border-border/50 px-3.5 py-2.5">
-        <div className="flex items-baseline justify-between gap-2">
-          {author ? (
-            <Link to={`/people/${author.id}`} className="text-xs font-bold text-fg hover:underline shrink-0">
-              {author.name}
-            </Link>
-          ) : (
-            <Skeleton className="h-3.5 w-16" />
-          )}
-          <span className="text-[10px] text-fg-muted shrink-0">{formatRelativeTime(comment.createdAt)}</span>
+    <div className="flex flex-col gap-1">
+      <div className="group/comment flex items-start gap-2.5">
+        {author ? (
+          <Avatar src={author.avatarUrl} name={author.name} size="xs" />
+        ) : (
+          <Skeleton className="size-6 rounded-full shrink-0" />
+        )}
+        <div className="min-w-0 flex-1 rounded-2xl bg-surface-sunken/70 border border-border/50 px-3.5 py-2.5">
+          <div className="flex items-baseline justify-between gap-2">
+            {author ? (
+              <Link to={`/people/${author.id}`} className="text-xs font-bold text-fg hover:underline shrink-0">
+                {author.name}
+              </Link>
+            ) : (
+              <Skeleton className="h-3.5 w-16" />
+            )}
+            <span className="text-[10px] text-fg-muted shrink-0">{formatRelativeTime(comment.createdAt)}</span>
+          </div>
+          <p className="text-sm text-fg whitespace-pre-line break-words mt-1 leading-relaxed">{comment.content}</p>
         </div>
-        <p className="text-sm text-fg whitespace-pre-line break-words mt-1 leading-relaxed">{comment.content}</p>
+        {canDelete && (
+          <DropdownMenu
+            align="right"
+            trigger={
+              <button
+                type="button"
+                className="flex size-6 shrink-0 items-center justify-center rounded-lg text-fg-muted opacity-0 group-hover/comment:opacity-100 hover:bg-surface-hover hover:text-fg cursor-pointer transition-all"
+                aria-label="Comment options"
+              >
+                <MoreHorizontal className="size-3.5" />
+              </button>
+            }
+          >
+            <DropdownItem danger icon={<Trash2 className="size-4" />} onClick={() => deleteMutation.mutate()}>
+              Delete
+            </DropdownItem>
+          </DropdownMenu>
+        )}
       </div>
+      <div className="flex items-center gap-3 pl-9 text-[11px] font-bold text-fg-muted">
+        <button type="button" onClick={() => onReply(comment)} className="hover:text-fg cursor-pointer transition-colors">
+          Reply
+        </button>
+        {!isReply && comment.replyCount > 0 && (
+          <button
+            type="button"
+            onClick={() => setRepliesOpen((o) => !o)}
+            className="hover:text-fg cursor-pointer transition-colors"
+          >
+            {repliesOpen ? 'Hide replies' : `View ${comment.replyCount} ${comment.replyCount === 1 ? 'reply' : 'replies'}`}
+          </button>
+        )}
+      </div>
+      {repliesOpen && (
+        <div className="pl-9 flex flex-col gap-2.5 mt-1">
+          {repliesLoading ? (
+            <Skeleton className="h-8 w-full rounded-xl" />
+          ) : (
+            replies?.map((r) => <CommentItem key={r.id} comment={r} post={post} isReply onReply={onReply} />)
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -158,6 +235,8 @@ function CommentsSection({ post }: { post: Post }) {
   const queryClient = useQueryClient()
   const { data: currentUser } = useCurrentUser()
   const [text, setText] = useState('')
+  const [replyingTo, setReplyingTo] = useState<PostComment | null>(null)
+  const { data: replyAuthor } = useUser(replyingTo?.authorId)
 
   const { data: comments, isLoading } = useQuery({
     queryKey: ['feed', post.id, 'comments'],
@@ -165,9 +244,10 @@ function CommentsSection({ post }: { post: Post }) {
   })
 
   const addMutation = useMutation({
-    mutationFn: (content: string) => feedService.addComment(post.id, content),
+    mutationFn: () => feedService.addComment(post.id, text.trim(), replyingTo?.id),
     onSuccess: () => {
       setText('')
+      setReplyingTo(null)
       queryClient.invalidateQueries({ queryKey: ['feed', post.id, 'comments'] })
       queryClient.invalidateQueries({ queryKey: ['feed'] })
     },
@@ -175,9 +255,8 @@ function CommentsSection({ post }: { post: Post }) {
   })
 
   function submit() {
-    const trimmed = text.trim()
-    if (!trimmed || addMutation.isPending) return
-    addMutation.mutate(trimmed)
+    if (!text.trim() || addMutation.isPending) return
+    addMutation.mutate()
   }
 
   return (
@@ -185,9 +264,9 @@ function CommentsSection({ post }: { post: Post }) {
       {isLoading ? (
         <Skeleton className="h-10 w-full rounded-xl" />
       ) : comments && comments.length > 0 ? (
-        <div className="flex flex-col gap-2.5 max-h-72 overflow-y-auto no-scrollbar">
+        <div className="flex flex-col gap-3 max-h-72 overflow-y-auto no-scrollbar">
           {comments.map((c) => (
-            <CommentItem key={c.id} comment={c} />
+            <CommentItem key={c.id} comment={c} post={post} onReply={setReplyingTo} />
           ))}
         </div>
       ) : !post.commentsDisabled ? (
@@ -197,30 +276,47 @@ function CommentsSection({ post }: { post: Post }) {
       {post.commentsDisabled ? (
         <p className="text-xs text-fg-muted text-center py-1 font-medium">Comments are turned off for this post.</p>
       ) : (
-        <div className="flex items-center gap-2.5 pt-1">
-          <Avatar src={currentUser?.avatarUrl} name={currentUser?.name ?? ''} size="xs" />
-          <input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                submit()
-              }
-            }}
-            placeholder="Write a comment…"
-            className="flex-1 rounded-full border border-border/80 bg-surface px-4 py-2 text-sm text-fg outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-fg-muted shadow-2xs"
-          />
-          <button
-            type="button"
-            onClick={submit}
-            disabled={!text.trim() || addMutation.isPending}
-            className="flex size-8.5 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-30 cursor-pointer transition-all active:scale-95 shadow-xs"
-            aria-label="Post comment"
-          >
-            <Send className="size-3.5" />
-          </button>
-        </div>
+        <>
+          {replyingTo && (
+            <div className="flex items-center justify-between gap-2 rounded-lg bg-surface-sunken px-3 py-1.5 text-xs">
+              <span className="text-fg-muted truncate">
+                Replying to <span className="font-bold text-fg">{replyAuthor?.name ?? '…'}</span>
+              </span>
+              <button
+                type="button"
+                onClick={() => setReplyingTo(null)}
+                className="text-fg-muted hover:text-fg cursor-pointer shrink-0"
+                aria-label="Cancel reply"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          )}
+          <div className="flex items-center gap-2.5 pt-1">
+            <Avatar src={currentUser?.avatarUrl} name={currentUser?.name ?? ''} size="xs" />
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault()
+                  submit()
+                }
+              }}
+              placeholder={replyingTo ? `Reply to ${replyAuthor?.name ?? 'comment'}…` : 'Write a comment…'}
+              className="flex-1 rounded-full border border-border/80 bg-surface px-4 py-2 text-sm text-fg outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20 transition-all placeholder:text-fg-muted shadow-2xs"
+            />
+            <button
+              type="button"
+              onClick={submit}
+              disabled={!text.trim() || addMutation.isPending}
+              className="flex size-8.5 shrink-0 items-center justify-center rounded-full bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-30 cursor-pointer transition-all active:scale-95 shadow-xs"
+              aria-label="Post comment"
+            >
+              <Send className="size-3.5" />
+            </button>
+          </div>
+        </>
       )}
     </div>
   )
@@ -237,6 +333,7 @@ export function PostCard({ post }: { post: Post }) {
   const [shareOpen, setShareOpen] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [editContent, setEditContent] = useState(post.content)
+  const [likesOpen, setLikesOpen] = useState(false)
 
   const likeMutation = useMutation({
     mutationFn: () => feedService.toggleLike(post.id),
@@ -397,19 +494,29 @@ export function PostCard({ post }: { post: Post }) {
       </div>
 
       <div className="flex items-center gap-4 px-4 sm:px-5 py-3 border-t border-border/70 bg-surface">
-        <button
-          type="button"
-          onClick={() => likeMutation.mutate()}
-          disabled={likeMutation.isPending}
-          className={cn(
-            'flex items-center gap-1.5 text-sm cursor-pointer transition-all duration-150 active:scale-90 font-medium disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100',
-            post.isLiked ? 'text-rose-500' : 'text-fg-secondary hover:text-fg',
+        <div className="flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => likeMutation.mutate()}
+            disabled={likeMutation.isPending}
+            className={cn(
+              'flex items-center text-sm cursor-pointer transition-all duration-150 active:scale-90 font-medium disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100',
+              post.isLiked ? 'text-rose-500' : 'text-fg-secondary hover:text-fg',
+            )}
+            aria-label={post.isLiked ? 'Unlike post' : 'Like post'}
+          >
+            <Heart className={cn('size-5 transition-transform', post.isLiked && 'fill-current scale-110')} />
+          </button>
+          {showLikeCount && (
+            <button
+              type="button"
+              onClick={() => setLikesOpen(true)}
+              className="text-xs sm:text-sm font-semibold text-fg-secondary hover:text-fg hover:underline cursor-pointer transition-colors"
+            >
+              {post.likesCount}
+            </button>
           )}
-          aria-label={post.isLiked ? 'Unlike post' : 'Like post'}
-        >
-          <Heart className={cn('size-5 transition-transform', post.isLiked && 'fill-current scale-110')} />
-          {showLikeCount && <span className="text-xs sm:text-sm font-semibold">{post.likesCount}</span>}
-        </button>
+        </div>
 
         <button
           type="button"
@@ -449,6 +556,8 @@ export function PostCard({ post }: { post: Post }) {
       {commentsOpen && <CommentsSection post={post} />}
 
       <ShareModal open={shareOpen} onClose={() => setShareOpen(false)} post={post} />
+
+      <LikesModal postId={post.id} open={likesOpen} onClose={() => setLikesOpen(false)} />
 
       <Modal open={showDeleteModal} onClose={() => setShowDeleteModal(false)} size="sm">
         <div className="flex flex-col items-center text-center gap-2 pb-4">
