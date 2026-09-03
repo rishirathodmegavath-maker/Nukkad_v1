@@ -7,6 +7,10 @@ interface DropdownMenuProps {
   children: ReactNode
   align?: 'left' | 'right'
   className?: string
+  /** Controlled open state — lets a caller open the menu from something other than clicking the
+   * trigger (e.g. a long-press elsewhere on the row). Omit both for the default uncontrolled behavior. */
+  open?: boolean
+  onOpenChange?: (open: boolean) => void
 }
 
 const MENU_ASSUMED_WIDTH = 220 // enough headroom for both the default 210px menu and any narrower override
@@ -14,8 +18,15 @@ const VIEWPORT_MARGIN = 8
 
 type MenuPosition = { top: number; bottom?: never; left: number; right?: never } | { top?: never; bottom: number; left: number; right?: never }
 
-export function DropdownMenu({ trigger, children, align = 'right', className }: DropdownMenuProps) {
-  const [open, setOpen] = useState(false)
+export function DropdownMenu({ trigger, children, align = 'right', className, open: openProp, onOpenChange }: DropdownMenuProps) {
+  const [internalOpen, setInternalOpen] = useState(false)
+  const isControlled = openProp !== undefined
+  const open = isControlled ? openProp : internalOpen
+  const setOpen = (next: boolean | ((prev: boolean) => boolean)) => {
+    const resolved = typeof next === 'function' ? next(open) : next
+    if (!isControlled) setInternalOpen(resolved)
+    onOpenChange?.(resolved)
+  }
   const [position, setPosition] = useState<MenuPosition | null>(null)
   const triggerRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)

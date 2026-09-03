@@ -22,6 +22,8 @@ export interface MessageDto {
   replyTo: RepliedMessagePreviewDto | null
   isRead: boolean
   readAt: string | null
+  editedAt: string | null
+  unsentAt: string | null
   createdAt: string
 }
 
@@ -68,6 +70,8 @@ export function mapMessage(dto: MessageDto): Message {
     createdAt: dto.createdAt,
     isRead: dto.isRead,
     readAt: dto.readAt ?? undefined,
+    editedAt: dto.editedAt ?? undefined,
+    unsentAt: dto.unsentAt ?? undefined,
   }
 }
 
@@ -130,6 +134,18 @@ export async function sendMessage(
     sharedPostId,
     replyToMessageId,
   })
+  return mapMessage(dto)
+}
+
+/** Updates the existing message's content in place — a new "Edited" indicator, not a new message. */
+export async function editMessage(conversationId: string, messageId: string, content: string): Promise<Message> {
+  const dto = await apiClient.patch<MessageDto>(`/conversations/${conversationId}/messages/${messageId}`, { content })
+  return mapMessage(dto)
+}
+
+/** "Unsend": removes the message for everyone. Distinct from {@link hideMessageForMe} ("delete for me"), which only changes the caller's own view. */
+export async function unsendMessage(conversationId: string, messageId: string): Promise<Message> {
+  const dto = await apiClient.post<MessageDto>(`/conversations/${conversationId}/messages/${messageId}/unsend`)
   return mapMessage(dto)
 }
 

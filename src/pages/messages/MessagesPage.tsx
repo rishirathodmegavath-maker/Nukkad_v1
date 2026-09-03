@@ -21,8 +21,17 @@ import {
   LogOut,
   Crown,
   Pencil,
+  Undo2,
 } from 'lucide-react'
-import { useConversations, useMessages, useSendMessage, useMarkConversationRead, useHideMessagesForMe } from '@/hooks/useConversations'
+import {
+  useConversations,
+  useMessages,
+  useSendMessage,
+  useMarkConversationRead,
+  useHideMessagesForMe,
+  useEditMessage,
+  useUnsendMessage,
+} from '@/hooks/useConversations'
 import { useUser } from '@/hooks/useUser'
 import { useSwipeToReply } from '@/hooks/useSwipeToReply'
 import { getCurrentUserId } from '@/services/users.service'
@@ -748,6 +757,8 @@ function MessageRow({
   registerRef,
   onToggleSelected,
   onReply,
+  onEdit,
+  onUnsend,
   onDelete,
   onJumpToMessage,
   onRetry,
@@ -766,23 +777,31 @@ function MessageRow({
   registerRef: (el: HTMLDivElement | null) => void
   onToggleSelected: (messageId: string) => void
   onReply: () => void
+  onEdit: () => void
+  onUnsend: () => void
   onDelete: () => void
   onJumpToMessage: (messageId: string) => void
   onRetry: () => void
 }) {
+  const [menuOpen, setMenuOpen] = useState(false)
   // Swipe is a mobile-only affordance in practice: without a touchscreen no touchstart ever
   // fires, so this is fully inert on desktop and the existing hover/dropdown reply path is
   // untouched. Disabled during select-mode so a drag can't fight message multi-select.
   // A pending/failed send has no real server id yet, so replying to it or deleting it would hit
-  // the API with a temp id — both actions (and the swipe gesture that leads to one of them) are
-  // disabled until it's actually persisted.
-  const actionsEnabled = !selectMode && !msg.pending && !msg.failed
+  // the API with a temp id — both actions (and the swipe/long-press gestures that lead to one of
+  // them) are disabled until it's actually persisted. An unsent message is a tombstone with
+  // nothing left to act on, so it's excluded the same way.
+  const actionsEnabled = !selectMode && !msg.pending && !msg.failed && !msg.unsentAt
   const {
     ref: swipeRef,
     revealWidth,
     revealOpacity,
     isDragging,
-  } = useSwipeToReply<HTMLDivElement>({ onTriggered: onReply, enabled: actionsEnabled })
+  } = useSwipeToReply<HTMLDivElement>({
+    onTriggered: onReply,
+    onLongPress: () => setMenuOpen(true),
+    enabled: actionsEnabled,
+  })
 
   const replyRevealIcon = (
     <div
@@ -797,10 +816,16 @@ function MessageRow({
     </div>
   )
 
+  // Edit is text-only: a SHARED_POST message has no separate caption field to edit, and its
+  // attachment/link itself is never editable — matching the backend's own restriction.
+  const canEdit = isOwn && msg.type === 'TEXT'
+
   const messageOptionsMenu = actionsEnabled && (
     <DropdownMenu
       align={isOwn ? 'right' : 'left'}
       className="min-w-[150px]"
+      open={menuOpen}
+      onOpenChange={setMenuOpen}
       trigger={
         <button
           type="button"
@@ -814,11 +839,26 @@ function MessageRow({
       <DropdownItem icon={<Reply className="size-4" />} onClick={onReply}>
         Reply
       </DropdownItem>
+      {canEdit && (
+        <DropdownItem icon={<Pencil className="size-4" />} onClick={onEdit}>
+          Edit
+        </DropdownItem>
+      )}
+      {isOwn && (
+        <DropdownItem icon={<Undo2 className="size-4" />} onClick={onUnsend}>
+          Unsend
+        </DropdownItem>
+      )}
       <DropdownItem danger icon={<Trash2 className="size-4" />} onClick={onDelete}>
         Delete for me
       </DropdownItem>
     </DropdownMenu>
   )
+
+  const metaParts = [
+    msg.editedAt ? 'Edited' : null,
+    isOwn && isLastOwnMessage ? getMessageStatusLabel(msg) : null,
+  ].filter((p): p is string => !!p)
 
   return (
     <div
@@ -842,6 +882,19 @@ function MessageRow({
           that ancestor to exactly the bubble's own content — so "70% of it" always clips below
           the content's natural size and messages wrap far too early. */}
       <div className={cn('flex flex-col gap-0.5 max-w-[85%] sm:max-w-[70%]', isOwn ? 'items-end' : 'items-start')}>
+        {msg.unsentAt ? (
+          // Global tombstone: content/attachment are gone for everyone at this point, so there's
+          // nothing left to reply to, edit, or act on — no options menu, no reply-reveal here.
+          <div
+            className={cn(
+              'flex items-center gap-1.5 px-3.5 py-2 rounded-2xl text-xs italic text-fg-muted/70 bg-surface-sunken/50 border border-border/40 transition-shadow duration-500',
+              highlightedMessageId === msg.id && 'ring-2 ring-brand-500',
+            )}
+          >
+            <Undo2 className="size-3.5 shrink-0 opacity-60" />
+            {isOwn ? 'You unsent a message' : 'This message was unsent'}
+          </div>
+        ) : (
         <div className={cn('group flex items-end gap-1.5 max-w-full', isOwn && 'flex-row-reverse')}>
           {!isOwn &&
             (isLast ? (
@@ -930,18 +983,21 @@ function MessageRow({
             </>
           )}
         </div>
+        )}
 
-        {/* Instagram-style text status — Sent / Seen <time>, never a checkmark — shown only on the
-            most recent message I sent, matching how Instagram avoids repeating it on every bubble. */}
-        {isOwn && isLastOwnMessage && (
+        {/* "Edited" (any edited message) and the Instagram-style text status — Sent / Seen <time>,
+            never a checkmark, shown only on the most recent message I sent — share one compact,
+            subtle line rather than each getting their own, matching the existing timestamp/status
+            arrangement. Suppressed entirely on a tombstone: nothing left to annotate. */}
+        {!msg.unsentAt && metaParts.length > 0 && (
           <p
-            key={getMessageStatusLabel(msg)}
+            key={metaParts.join('|')}
             className={cn(
               'text-[10px] px-1 animate-in fade-in duration-300',
               msg.failed ? 'text-danger-500' : 'text-fg-muted/80',
             )}
           >
-            {getMessageStatusLabel(msg)}
+            {metaParts.join(' · ')}
             {msg.failed && (
               <button type="button" onClick={onRetry} className="ml-1.5 font-semibold underline cursor-pointer">
                 Retry
@@ -982,6 +1038,20 @@ function ComposerReplyPreview({
   )
 }
 
+function ComposerEditingBanner({ onCancel }: { onCancel: () => void }) {
+  return (
+    <div className="flex items-center justify-between gap-2 px-4 pt-2.5 text-xs">
+      <div className="flex-1 min-w-0 flex items-center gap-1.5 rounded-lg bg-surface-sunken border-l-2 border-brand-500 px-2.5 py-1.5">
+        <Pencil className="size-3.5 text-brand-500 shrink-0" />
+        <p className="font-semibold text-fg">Editing message</p>
+      </div>
+      <button type="button" onClick={onCancel} className="text-fg-muted hover:text-fg cursor-pointer shrink-0" aria-label="Cancel edit">
+        <X className="size-4" />
+      </button>
+    </div>
+  )
+}
+
 function ChatPanel({ conversationId }: { conversationId: string }) {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
@@ -992,6 +1062,8 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
   const { data: otherUser } = useUser(otherUserId)
   const { data: messages, isLoading } = useMessages(conversationId)
   const sendMutation = useSendMessage(conversationId)
+  const editMutation = useEditMessage(conversationId)
+  const unsendMutation = useUnsendMessage(conversationId)
   const markReadMutation = useMarkConversationRead(conversationId)
   const markRead = markReadMutation.mutate
   const hideMessagesMutation = useHideMessagesForMe(conversationId)
@@ -1001,9 +1073,41 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [deleteTarget, setDeleteTarget] = useState<string[] | null>(null)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null)
+  const [unsendTarget, setUnsendTarget] = useState<Message | null>(null)
   const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null)
   const messageRowRefs = useRef(new Map<string, HTMLDivElement>())
+  const composerInputRef = useRef<HTMLInputElement>(null)
   const myId = getCurrentUserId()
+
+  // Reply and edit share one composer, so starting one always cancels the other.
+  function startReply(msg: Message) {
+    setEditingMessage(null)
+    setReplyingTo(msg)
+  }
+
+  function startEdit(msg: Message) {
+    setReplyingTo(null)
+    setEditingMessage(msg)
+    setDraft(msg.content)
+  }
+
+  function cancelEdit() {
+    setEditingMessage(null)
+    setDraft('')
+  }
+
+  useEffect(() => {
+    if (editingMessage) composerInputRef.current?.focus()
+  }, [editingMessage])
+
+  function confirmUnsend() {
+    if (!unsendTarget) return
+    unsendMutation.mutate(unsendTarget.id, {
+      onSuccess: () => setUnsendTarget(null),
+      onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not unsend message'),
+    })
+  }
 
   function jumpToMessage(messageId: string) {
     const el = messageRowRefs.current.get(messageId)
@@ -1054,6 +1158,7 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
   useEffect(() => {
     markRead()
     setReplyingTo(null)
+    setEditingMessage(null)
   }, [conversationId, markRead])
 
   function handleScroll() {
@@ -1078,7 +1183,27 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
 
   function handleSend(e: FormEvent) {
     e.preventDefault()
-    if (!draft.trim()) return
+    const trimmed = draft.trim()
+    if (!trimmed) return
+
+    if (editingMessage) {
+      // Unchanged content is a deliberate no-op — nothing to save, so no request is made.
+      if (trimmed === editingMessage.content.trim()) {
+        cancelEdit()
+        return
+      }
+      editMutation.mutate(
+        { messageId: editingMessage.id, content: trimmed },
+        {
+          onSuccess: cancelEdit,
+          // Keep the draft and editingMessage intact on failure — the original message is
+          // untouched server-side, and the user's in-progress edit shouldn't be lost either.
+          onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not edit message'),
+        },
+      )
+      return
+    }
+
     const replyToPreview: Message['replyTo'] = replyingTo
       ? {
           id: replyingTo.id,
@@ -1087,7 +1212,7 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
           contentSnippet: replyingTo.type === 'SHARED_POST' ? 'Shared a post' : replyingTo.content.slice(0, 120),
         }
       : undefined
-    sendMutation.mutate({ content: draft.trim(), replyToMessageId: replyingTo?.id, replyToPreview })
+    sendMutation.mutate({ content: trimmed, replyToMessageId: replyingTo?.id, replyToPreview })
     setDraft('')
     setReplyingTo(null)
   }
@@ -1226,7 +1351,9 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                           else messageRowRefs.current.delete(msg.id)
                         }}
                         onToggleSelected={toggleSelected}
-                        onReply={() => setReplyingTo(msg)}
+                        onReply={() => startReply(msg)}
+                        onEdit={() => startEdit(msg)}
+                        onUnsend={() => setUnsendTarget(msg)}
                         onDelete={() => setDeleteTarget([msg.id])}
                         onJumpToMessage={jumpToMessage}
                         onRetry={() => retryFailedMessage(msg)}
@@ -1247,9 +1374,14 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
           </div>
         ) : (
           <div className="border-t border-border/70 bg-surface">
-            {replyingTo && <ComposerReplyPreview replyingTo={replyingTo} myId={myId} onCancel={() => setReplyingTo(null)} />}
+            {editingMessage ? (
+              <ComposerEditingBanner onCancel={cancelEdit} />
+            ) : (
+              replyingTo && <ComposerReplyPreview replyingTo={replyingTo} myId={myId} onCancel={() => setReplyingTo(null)} />
+            )}
             <form onSubmit={handleSend} className="flex items-center gap-2 px-4 py-3">
               <input
+                ref={composerInputRef}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder="Write a message…"
@@ -1258,10 +1390,10 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
               <button
                 type="submit"
                 disabled={!draft.trim()}
-                aria-label="Send message"
+                aria-label={editingMessage ? 'Save edit' : 'Send message'}
                 className="flex size-10 items-center justify-center rounded-full bg-brand-600 text-white hover:bg-brand-700 disabled:opacity-40 cursor-pointer shrink-0 transition-all active:scale-95 shadow-xs"
               >
-                <Send className="size-4" />
+                {editingMessage ? <Check className="size-4" /> : <Send className="size-4" />}
               </button>
             </form>
           </div>
@@ -1299,6 +1431,28 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
               onClick={confirmDelete}
             >
               Delete for me
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal open={unsendTarget !== null} onClose={() => setUnsendTarget(null)} size="sm">
+        <div className="flex flex-col gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 items-center justify-center rounded-xl bg-danger-50 dark:bg-danger-950/40 text-danger-600 dark:text-danger-400 border border-danger-200/60 dark:border-danger-800/40 shrink-0">
+              <Undo2 className="size-5" />
+            </div>
+            <div>
+              <h3 className="text-base font-bold text-fg">Unsend message?</h3>
+              <p className="text-xs text-fg-muted mt-0.5">This will remove this message for everyone.</p>
+            </div>
+          </div>
+          <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border/70">
+            <Button variant="secondary" size="sm" onClick={() => setUnsendTarget(null)}>
+              Cancel
+            </Button>
+            <Button variant="danger" size="sm" isLoading={unsendMutation.isPending} onClick={confirmUnsend}>
+              Unsend
             </Button>
           </div>
         </div>

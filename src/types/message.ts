@@ -24,6 +24,11 @@ export interface Message {
   createdAt: string
   isRead: boolean
   readAt?: string
+  /** Set once the message has been edited; presence alone is the "Edited" indicator. */
+  editedAt?: string
+  /** Set once the sender has unsent this message for everyone — content/attachment are already
+   * gone server-side by the time this is set, distinct from a per-viewer "delete for me". */
+  unsentAt?: string
   /** Client-only, never persisted: an optimistic row still in flight, or one whose send failed. */
   pending?: boolean
   failed?: boolean

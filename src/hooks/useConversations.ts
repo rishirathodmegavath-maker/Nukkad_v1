@@ -47,8 +47,13 @@ export function useMessages(conversationId: string | undefined) {
       const incoming = mapMessage(dto)
       queryClient.setQueryData<Message[]>(['messages', conversationId], (existing) => {
         if (!existing) return [incoming]
-        if (existing.some((m) => m.id === incoming.id)) return existing
-        return [...existing, incoming]
+        const idx = existing.findIndex((m) => m.id === incoming.id)
+        // A known id is an in-place update (edit or unsend), not a duplicate to ignore — this is
+        // what lets a live edit/unsend from the other participant update on screen without a refresh.
+        if (idx === -1) return [...existing, incoming]
+        const next = [...existing]
+        next[idx] = incoming
+        return next
       })
       queryClient.invalidateQueries({ queryKey: ['conversations'] })
     })
@@ -141,6 +146,36 @@ export function useSendMessage(conversationId: string | undefined) {
       queryClient.setQueryData<Message[]>(['messages', conversationId], (existing) =>
         existing?.map((m) => (m.id === context.tempId ? { ...m, pending: false, failed: true } : m)),
       )
+    },
+  })
+}
+
+/** Edit: updates the existing message in place (never a new row) — the same real-time subscription
+ * above upserts this same result if the other participant has the conversation open. */
+export function useEditMessage(conversationId: string | undefined) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: ({ messageId, content }: { messageId: string; content: string }) =>
+      messagesService.editMessage(conversationId!, messageId, content),
+    onSuccess: (message) => {
+      queryClient.setQueryData<Message[]>(['messages', conversationId], (existing) =>
+        existing?.map((m) => (m.id === message.id ? message : m)),
+      )
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
+    },
+  })
+}
+
+/** Unsend: global for everyone, distinct from {@link useHideMessagesForMe} ("delete for me"). */
+export function useUnsendMessage(conversationId: string | undefined) {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: (messageId: string) => messagesService.unsendMessage(conversationId!, messageId),
+    onSuccess: (message) => {
+      queryClient.setQueryData<Message[]>(['messages', conversationId], (existing) =>
+        existing?.map((m) => (m.id === message.id ? message : m)),
+      )
+      queryClient.invalidateQueries({ queryKey: ['conversations'] })
     },
   })
 }
