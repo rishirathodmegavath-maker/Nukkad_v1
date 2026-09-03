@@ -76,8 +76,8 @@ export default function OpportunityDetailPage() {
 
   const closeMutation = useMutation({
     mutationFn: () => closeOpportunity(id!),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['opportunity', id] })
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['opportunity', id], updated)
       toast.success('Opportunity closed — it no longer accepts new applications')
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not close this opportunity'),
@@ -85,8 +85,8 @@ export default function OpportunityDetailPage() {
 
   const reopenMutation = useMutation({
     mutationFn: () => reopenOpportunity(id!),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['opportunity', id] })
+    onSuccess: (updated) => {
+      queryClient.setQueryData(['opportunity', id], updated)
       toast.success('Opportunity reopened')
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not reopen this opportunity'),
