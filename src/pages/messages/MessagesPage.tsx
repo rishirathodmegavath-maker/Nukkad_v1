@@ -680,19 +680,32 @@ function GroupSenderLabel({ senderId }: { senderId: string }) {
   return <p className="text-[11px] font-semibold text-fg-muted mb-0.5 ml-8">{user.name}</p>
 }
 
-function ReplyPreviewStrip({ replyTo, isOwn }: { replyTo: Message['replyTo']; isOwn: boolean }) {
+function ReplyPreviewStrip({
+  replyTo,
+  isOwn,
+  onJumpToMessage,
+}: {
+  replyTo: Message['replyTo']
+  isOwn: boolean
+  onJumpToMessage: (messageId: string) => void
+}) {
   const { data: sender } = useUser(replyTo?.senderId)
   if (!replyTo) return null
   return (
-    <div
+    <button
+      type="button"
+      onClick={() => onJumpToMessage(replyTo.id)}
+      aria-label={`Jump to original message from ${sender?.name ?? 'this person'}`}
       className={cn(
-        'rounded-lg px-2.5 py-1.5 text-xs mb-1 border-l-2 max-w-full',
-        isOwn ? 'bg-white/10 border-white/40 text-white/90' : 'bg-surface border-brand-400 text-fg-muted',
+        'flex flex-col w-full min-w-0 text-left rounded-md pl-2 pr-2.5 py-1 mb-1.5 border-l-2 max-w-full cursor-pointer transition-colors',
+        isOwn ? 'bg-black/10 border-white/50 hover:bg-black/15' : 'bg-fg/5 border-brand-400 hover:bg-fg/10',
       )}
     >
-      <p className="font-semibold truncate">{sender?.name ?? '…'}</p>
-      <p className="truncate opacity-80">{replyTo.type === 'SHARED_POST' ? 'Shared a post' : replyTo.contentSnippet}</p>
-    </div>
+      <p className={cn('text-[11px] font-semibold truncate', isOwn ? 'text-white/90' : 'text-brand-600')}>{sender?.name ?? '…'}</p>
+      <p className={cn('text-xs truncate', isOwn ? 'text-white/70' : 'text-fg-muted')}>
+        {replyTo.type === 'SHARED_POST' ? 'Shared a post' : replyTo.contentSnippet}
+      </p>
+    </button>
   )
 }
 
@@ -714,7 +727,22 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [deleteTarget, setDeleteTarget] = useState<string[] | null>(null)
   const [replyingTo, setReplyingTo] = useState<Message | null>(null)
+  const [highlightedMessageId, setHighlightedMessageId] = useState<string | null>(null)
+  const messageRowRefs = useRef(new Map<string, HTMLDivElement>())
   const myId = getCurrentUserId()
+
+  function jumpToMessage(messageId: string) {
+    const el = messageRowRefs.current.get(messageId)
+    if (!el) {
+      toast.info('Original message unavailable')
+      return
+    }
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    setHighlightedMessageId(messageId)
+    window.setTimeout(() => {
+      setHighlightedMessageId((current) => (current === messageId ? null : current))
+    }, 1500)
+  }
 
   function toggleSelected(messageId: string) {
     setSelectedIds((prev) => {
@@ -883,100 +911,121 @@ function ChatPanel({ conversationId }: { conversationId: string }) {
                     // available on every message — including ones sent by the other participant.
                     const isSelected = selectedIds.has(msg.id)
                     return (
-                      <div key={msg.id} className={cn('group flex items-end gap-1.5', isOwn ? 'self-end flex-row-reverse' : 'self-start')}>
-                        {!isOwn &&
-                          (isLast ? (
-                            <MessageSenderAvatar senderId={msg.senderId} isGroup={!!isGroup} otherUser={otherUser} />
-                          ) : (
-                            <span className="size-6 shrink-0" />
-                          ))}
+                      <div
+                        key={msg.id}
+                        ref={(el) => {
+                          if (el) messageRowRefs.current.set(msg.id, el)
+                          else messageRowRefs.current.delete(msg.id)
+                        }}
+                        // A definite w-full row is what lets the max-w-[70%] below resolve against
+                        // the chat column's real width — nesting it straight inside a shrink-to-fit
+                        // flex item instead (as this used to) makes the browser size that ancestor to
+                        // exactly the bubble's own content, so "70% of it" clips below the content's
+                        // natural size and every message wraps far earlier than it needs to.
+                        className={cn('flex w-full', isOwn ? 'justify-end' : 'justify-start')}
+                      >
+                        <div className={cn('group flex items-end gap-1.5 max-w-[85%] sm:max-w-[70%]', isOwn && 'flex-row-reverse')}>
+                          {!isOwn &&
+                            (isLast ? (
+                              <MessageSenderAvatar senderId={msg.senderId} isGroup={!!isGroup} otherUser={otherUser} />
+                            ) : (
+                              <span className="size-6 shrink-0" />
+                            ))}
 
-                        {selectMode && (
-                          <button
-                            type="button"
-                            onClick={() => toggleSelected(msg.id)}
-                            aria-label={isSelected ? 'Deselect message' : 'Select message'}
-                            className={cn(
-                              'flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors cursor-pointer',
-                              isSelected ? 'bg-brand-600 border-brand-600 text-white' : 'border-border-strong hover:border-brand-500',
-                            )}
-                          >
-                            {isSelected && <Check className="size-3" />}
-                          </button>
-                        )}
-
-                        {msg.type === 'SHARED_POST' ? (
-                          <div className={cn('flex items-end gap-1.5', isOwn && 'flex-row-reverse')}>
-                            <div className={cn('flex flex-col gap-1.5 max-w-[85%] sm:max-w-[75%]', isOwn && 'items-end')}>
-                              <SharedPostPreview message={msg} conversationId={conversationId} />
-                              {msg.content && (
-                                <div
-                                  className={cn(
-                                    'rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
-                                    isOwn ? 'bg-brand-600 text-white rounded-br-sm' : 'bg-surface-sunken text-fg rounded-bl-sm border border-border/60',
-                                  )}
-                                >
-                                  {msg.replyTo && <ReplyPreviewStrip replyTo={msg.replyTo} isOwn={isOwn} />}
-                                  {msg.content}
-                                </div>
-                              )}
-                            </div>
-                            {!selectMode && (
-                              <DropdownMenu
-                                align={isOwn ? 'right' : 'left'}
-                                trigger={
-                                  <button
-                                    type="button"
-                                    className="flex size-7 items-center justify-center rounded-lg text-fg-muted/70 hover:text-fg hover:bg-surface-hover cursor-pointer transition-all opacity-0 group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-40 hover:!opacity-100"
-                                    aria-label="Message options"
-                                  >
-                                    <MoreHorizontal className="size-4" />
-                                  </button>
-                                }
-                              >
-                                <DropdownItem icon={<Reply className="size-4" />} onClick={() => setReplyingTo(msg)}>
-                                  Reply
-                                </DropdownItem>
-                                <DropdownItem danger icon={<Trash2 className="size-4" />} onClick={() => setDeleteTarget([msg.id])}>
-                                  Delete for me
-                                </DropdownItem>
-                              </DropdownMenu>
-                            )}
-                          </div>
-                        ) : (
-                          <div className={cn('flex items-end gap-1.5', isOwn && 'flex-row-reverse')}>
-                            <div
+                          {selectMode && (
+                            <button
+                              type="button"
+                              onClick={() => toggleSelected(msg.id)}
+                              aria-label={isSelected ? 'Deselect message' : 'Select message'}
                               className={cn(
-                                'max-w-[85%] sm:max-w-[75%] rounded-2xl px-4 py-2.5 text-sm leading-relaxed',
-                                isOwn ? 'bg-brand-600 text-white rounded-br-sm shadow-2xs' : 'bg-surface-sunken text-fg rounded-bl-sm border border-border/60',
+                                'flex size-5 shrink-0 items-center justify-center rounded-full border-2 transition-colors cursor-pointer',
+                                isSelected ? 'bg-brand-600 border-brand-600 text-white' : 'border-border-strong hover:border-brand-500',
                               )}
                             >
-                              {msg.replyTo && <ReplyPreviewStrip replyTo={msg.replyTo} isOwn={isOwn} />}
-                              {msg.content}
-                            </div>
-                            {!selectMode && (
-                              <DropdownMenu
-                                align={isOwn ? 'right' : 'left'}
-                                trigger={
-                                  <button
-                                    type="button"
-                                    className="flex size-7 items-center justify-center rounded-lg text-fg-muted/70 hover:text-fg hover:bg-surface-hover cursor-pointer transition-all opacity-0 group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-40 hover:!opacity-100"
-                                    aria-label="Message options"
-                                  >
-                                    <MoreHorizontal className="size-4" />
-                                  </button>
-                                }
+                              {isSelected && <Check className="size-3" />}
+                            </button>
+                          )}
+
+                          {msg.type === 'SHARED_POST' ? (
+                            <>
+                              <div
+                                className={cn(
+                                  'flex flex-col gap-1.5 min-w-0 transition-shadow duration-500 rounded-xl',
+                                  isOwn && 'items-end',
+                                  highlightedMessageId === msg.id && 'ring-2 ring-brand-500',
+                                )}
                               >
-                                <DropdownItem icon={<Reply className="size-4" />} onClick={() => setReplyingTo(msg)}>
-                                  Reply
-                                </DropdownItem>
-                                <DropdownItem danger icon={<Trash2 className="size-4" />} onClick={() => setDeleteTarget([msg.id])}>
-                                  Delete for me
-                                </DropdownItem>
-                              </DropdownMenu>
-                            )}
-                          </div>
-                        )}
+                                <SharedPostPreview message={msg} conversationId={conversationId} />
+                                {msg.content && (
+                                  <div
+                                    className={cn(
+                                      'w-fit max-w-full rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words',
+                                      isOwn ? 'bg-brand-600 text-white rounded-br-sm' : 'bg-surface-sunken text-fg rounded-bl-sm border border-border/60',
+                                    )}
+                                  >
+                                    {msg.replyTo && <ReplyPreviewStrip replyTo={msg.replyTo} isOwn={isOwn} onJumpToMessage={jumpToMessage} />}
+                                    {msg.content}
+                                  </div>
+                                )}
+                              </div>
+                              {!selectMode && (
+                                <DropdownMenu
+                                  align={isOwn ? 'right' : 'left'}
+                                  trigger={
+                                    <button
+                                      type="button"
+                                      className="flex size-7 items-center justify-center rounded-lg text-fg-muted/70 hover:text-fg hover:bg-surface-hover cursor-pointer transition-all opacity-0 group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-40 hover:!opacity-100"
+                                      aria-label="Message options"
+                                    >
+                                      <MoreHorizontal className="size-4" />
+                                    </button>
+                                  }
+                                >
+                                  <DropdownItem icon={<Reply className="size-4" />} onClick={() => setReplyingTo(msg)}>
+                                    Reply
+                                  </DropdownItem>
+                                  <DropdownItem danger icon={<Trash2 className="size-4" />} onClick={() => setDeleteTarget([msg.id])}>
+                                    Delete for me
+                                  </DropdownItem>
+                                </DropdownMenu>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <div
+                                className={cn(
+                                  'w-fit min-w-0 max-w-full rounded-2xl px-4 py-2.5 text-sm leading-relaxed break-words transition-shadow duration-500',
+                                  isOwn ? 'bg-brand-600 text-white rounded-br-sm shadow-2xs' : 'bg-surface-sunken text-fg rounded-bl-sm border border-border/60',
+                                  highlightedMessageId === msg.id && 'ring-2 ring-brand-500',
+                                )}
+                              >
+                                {msg.replyTo && <ReplyPreviewStrip replyTo={msg.replyTo} isOwn={isOwn} onJumpToMessage={jumpToMessage} />}
+                                {msg.content}
+                              </div>
+                              {!selectMode && (
+                                <DropdownMenu
+                                  align={isOwn ? 'right' : 'left'}
+                                  trigger={
+                                    <button
+                                      type="button"
+                                      className="flex size-7 items-center justify-center rounded-lg text-fg-muted/70 hover:text-fg hover:bg-surface-hover cursor-pointer transition-all opacity-0 group-hover:opacity-100 focus-within:opacity-100 max-sm:opacity-40 hover:!opacity-100"
+                                      aria-label="Message options"
+                                    >
+                                      <MoreHorizontal className="size-4" />
+                                    </button>
+                                  }
+                                >
+                                  <DropdownItem icon={<Reply className="size-4" />} onClick={() => setReplyingTo(msg)}>
+                                    Reply
+                                  </DropdownItem>
+                                  <DropdownItem danger icon={<Trash2 className="size-4" />} onClick={() => setDeleteTarget([msg.id])}>
+                                    Delete for me
+                                  </DropdownItem>
+                                </DropdownMenu>
+                              )}
+                            </>
+                          )}
+                        </div>
                       </div>
                     )
                   })}
