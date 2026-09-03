@@ -21,6 +21,9 @@ import StartupsListPage from '@/pages/startups/StartupsListPage'
 import RegisterStartupPage from '@/pages/startups/RegisterStartupPage'
 import StartupDetailPage from '@/pages/startups/StartupDetailPage'
 import OpportunitiesListPage from '@/pages/opportunities/OpportunitiesListPage'
+import PostOpportunityPage from '@/pages/opportunities/PostOpportunityPage'
+import MyApplicationsPage from '@/pages/opportunities/MyApplicationsPage'
+import PostedByMePage from '@/pages/opportunities/PostedByMePage'
 import OpportunityDetailPage from '@/pages/opportunities/OpportunityDetailPage'
 import OpportunityApplicationsPage from '@/pages/opportunities/OpportunityApplicationsPage'
 import ChaptersListPage from '@/pages/chapters/ChaptersListPage'
@@ -76,6 +79,10 @@ export function AppRoutes() {
           <Route path="/startups/:id" element={<StartupDetailPage />} />
 
           <Route path="/opportunities" element={<OpportunitiesListPage />} />
+          <Route path="/opportunities/new" element={<PostOpportunityPage />} />
+          <Route path="/opportunities/mine" element={<MyApplicationsPage />} />
+          <Route path="/opportunities/posted" element={<PostedByMePage />} />
+          <Route path="/opportunities/:id/edit" element={<PostOpportunityPage />} />
           <Route path="/opportunities/:id" element={<OpportunityDetailPage />} />
           <Route path="/opportunities/:id/applications" element={<OpportunityApplicationsPage />} />
 

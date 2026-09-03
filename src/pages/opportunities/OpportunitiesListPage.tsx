@@ -1,11 +1,13 @@
 import { useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
-import { Briefcase } from 'lucide-react'
+import { Briefcase, Plus, Inbox, ListChecks } from 'lucide-react'
 import { listOpportunities, listRecommendedOpportunities } from '@/services/opportunities.service'
 import { OpportunityCard } from '@/components/domain/OpportunityCard'
 import { PageHeader } from '@/components/domain/PageHeader'
 import { SearchFilterBar } from '@/components/domain/SearchFilterBar'
 import { PillTabs } from '@/components/ui/Tabs'
+import { Button } from '@/components/ui/Button'
 import { CardSkeletonGrid } from '@/components/ui/Skeleton'
 import { EmptyState } from '@/components/ui/EmptyState'
 import type { OpportunityType } from '@/types'
@@ -59,7 +61,29 @@ export default function OpportunitiesListPage() {
 
   return (
     <div>
-      <PageHeader title="Opportunities" description="Jobs, internships, founding roles and co-founder openings from across Nukkad." />
+      <PageHeader
+        title="Opportunities"
+        description="Jobs, internships, founding roles and co-founder openings from across Nukkad."
+        action={
+          <div className="flex flex-wrap items-center gap-2">
+            <Link to="/opportunities/mine">
+              <Button variant="ghost" size="sm" leftIcon={<Inbox className="size-4" />}>
+                My Applications
+              </Button>
+            </Link>
+            <Link to="/opportunities/posted">
+              <Button variant="ghost" size="sm" leftIcon={<ListChecks className="size-4" />}>
+                Posted by Me
+              </Button>
+            </Link>
+            <Link to="/opportunities/new">
+              <Button size="sm" leftIcon={<Plus className="size-4" />}>
+                Post Opportunity
+              </Button>
+            </Link>
+          </div>
+        }
+      />
       <SearchFilterBar query={query} onQueryChange={setQuery} placeholder="Search opportunities…">
         <PillTabs items={TYPE_FILTERS} value={type} onChange={setType} />
       </SearchFilterBar>

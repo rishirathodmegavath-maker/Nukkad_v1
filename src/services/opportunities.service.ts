@@ -8,6 +8,7 @@ import type {
   Opportunity,
   OpportunityMatch,
   OpportunityType,
+  PostOpportunityInput,
 } from '@/types'
 
 export interface OpportunityFilters {
@@ -22,6 +23,7 @@ interface OpportunityDto {
   id: string
   title: string
   type: string
+  closed: boolean
   startupId: string | null
   organizationName: string
   location: string | null
@@ -45,6 +47,7 @@ function mapOpportunity(dto: OpportunityDto): Opportunity {
     id: dto.id,
     title: dto.title,
     type: dto.type as OpportunityType,
+    closed: dto.closed,
     startupId: dto.startupId ?? undefined,
     organizationName: dto.organizationName,
     location: dto.location ?? '',
@@ -80,6 +83,56 @@ export async function getOpportunity(id: string): Promise<Opportunity | undefine
   } catch {
     return undefined
   }
+}
+
+export async function postOpportunity(input: PostOpportunityInput): Promise<Opportunity> {
+  return mapOpportunity(
+    await apiClient.post<OpportunityDto>('/opportunities', {
+      title: input.title,
+      type: input.type,
+      startupId: input.startupId || undefined,
+      organizationName: input.organizationName,
+      location: input.location || undefined,
+      remote: input.remote,
+      description: input.description,
+      requirements: input.requirements ?? [],
+      compensation: input.compensation || undefined,
+    }),
+  )
+}
+
+export async function updateOpportunity(id: string, input: PostOpportunityInput): Promise<Opportunity> {
+  return mapOpportunity(
+    await apiClient.put<OpportunityDto>(`/opportunities/${id}`, {
+      title: input.title,
+      type: input.type,
+      startupId: input.startupId || undefined,
+      organizationName: input.organizationName,
+      location: input.location || undefined,
+      remote: input.remote,
+      description: input.description,
+      requirements: input.requirements ?? [],
+      compensation: input.compensation || undefined,
+    }),
+  )
+}
+
+export async function closeOpportunity(id: string): Promise<Opportunity> {
+  return mapOpportunity(await apiClient.post<OpportunityDto>(`/opportunities/${id}/close`))
+}
+
+export async function reopenOpportunity(id: string): Promise<Opportunity> {
+  return mapOpportunity(await apiClient.post<OpportunityDto>(`/opportunities/${id}/reopen`))
+}
+
+export async function listMyPosted(): Promise<Opportunity[]> {
+  const dtos = await getPage<OpportunityDto>('/opportunities/me/posted')
+  return dtos.map(mapOpportunity)
+}
+
+export async function listMyApplications(): Promise<Opportunity[]> {
+  const dtos = await getPage<OpportunityDto>('/opportunities/me/applications')
+  return dtos.map(mapOpportunity)
 }
 
 export async function expressInterestInOpportunity(id: string): Promise<Opportunity> {

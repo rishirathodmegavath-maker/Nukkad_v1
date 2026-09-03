@@ -99,6 +99,11 @@ export async function createStartup(input: CreateStartupInput): Promise<Startup>
   )
 }
 
+export async function listMyFoundedStartups(): Promise<Startup[]> {
+  const dtos = await apiClient.get<StartupDto[]>('/startups/me/founding')
+  return dtos.map(mapStartup)
+}
+
 export async function getStartup(id: string): Promise<Startup | undefined> {
   try {
     return mapStartup(await apiClient.get<StartupDto>(`/startups/${id}`))

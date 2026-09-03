@@ -15,6 +15,7 @@ export interface Opportunity {
   id: string
   title: string
   type: OpportunityType
+  closed: boolean
   startupId?: string
   organizationName: string
   location: string
@@ -34,6 +35,18 @@ export interface Opportunity {
   interestCount?: number
   chapterId?: string
   createdAt: string
+}
+
+export interface PostOpportunityInput {
+  title: string
+  type: OpportunityType
+  startupId?: string
+  organizationName: string
+  location?: string
+  remote: boolean
+  description: string
+  requirements?: string[]
+  compensation?: string
 }
 
 export interface ApplyToOpportunityInput {

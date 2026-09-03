@@ -1,0 +1,303 @@
+import { useEffect, useState, type FormEvent } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { useMutation, useQuery } from '@tanstack/react-query'
+import { Briefcase, MapPin, IndianRupee, CheckCircle2 } from 'lucide-react'
+import { Input, Textarea, Select } from '@/components/ui/Input'
+import { TagInput } from '@/components/ui/TagInput'
+import { Button } from '@/components/ui/Button'
+import { Card } from '@/components/ui/Card'
+import { Badge } from '@/components/ui/Badge'
+import { PageHeader } from '@/components/domain/PageHeader'
+import { Skeleton } from '@/components/ui/Skeleton'
+import { getOpportunity, postOpportunity, updateOpportunity } from '@/services/opportunities.service'
+import { listMyFoundedStartups } from '@/services/startups.service'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { toast } from '@/store/toast.store'
+import type { Opportunity, OpportunityType } from '@/types'
+
+const TYPES: OpportunityType[] = [
+  'Full-time',
+  'Internship',
+  'Founding Role',
+  'Co-founder',
+  'Startup Project',
+  'AI/ML Role',
+  'Campus',
+]
+
+type Step = 'form' | 'preview' | 'success'
+
+export default function PostOpportunityPage() {
+  const { id } = useParams<{ id?: string }>()
+  const isEdit = !!id
+  const navigate = useNavigate()
+  const { data: currentUser } = useCurrentUser()
+
+  const [step, setStep] = useState<Step>('form')
+  const [title, setTitle] = useState('')
+  const [type, setType] = useState<OpportunityType>('Internship')
+  const [organizationName, setOrganizationName] = useState('')
+  const [startupId, setStartupId] = useState('')
+  const [location, setLocation] = useState('')
+  const [remote, setRemote] = useState(false)
+  const [description, setDescription] = useState('')
+  const [requirements, setRequirements] = useState<string[]>([])
+  const [compensation, setCompensation] = useState('')
+  const [published, setPublished] = useState<Opportunity | null>(null)
+  const [prefilled, setPrefilled] = useState(!isEdit)
+
+  const { data: foundedStartups, isLoading: startupsLoading } = useQuery({
+    queryKey: ['startups', 'me', 'founding'],
+    queryFn: listMyFoundedStartups,
+  })
+
+  const { data: existing, isLoading: existingLoading } = useQuery({
+    queryKey: ['opportunity', id],
+    queryFn: () => getOpportunity(id!),
+    enabled: isEdit,
+  })
+
+  useEffect(() => {
+    if (!isEdit || !existing || prefilled) return
+    if (currentUser && existing.postedByUserId !== currentUser.id) {
+      toast.error("You can't edit an opportunity you didn't post")
+      navigate(`/opportunities/${id}`, { replace: true })
+      return
+    }
+    setTitle(existing.title)
+    setType(existing.type)
+    setOrganizationName(existing.organizationName)
+    setStartupId(existing.startupId ?? '')
+    setLocation(existing.location)
+    setRemote(existing.remote)
+    setDescription(existing.description)
+    setRequirements(existing.requirements)
+    setCompensation(existing.compensation ?? '')
+    setPrefilled(true)
+  }, [isEdit, existing, prefilled, currentUser, navigate, id])
+
+  useEffect(() => {
+    if (!isEdit && foundedStartups && foundedStartups.length === 0) {
+      toast.error('Register a startup first — only founders can post an opportunity')
+      navigate('/startups', { replace: true })
+    }
+  }, [isEdit, foundedStartups, navigate])
+
+  function selectStartup(newStartupId: string) {
+    setStartupId(newStartupId)
+    const startup = foundedStartups?.find((s) => s.id === newStartupId)
+    if (startup) setOrganizationName(startup.name)
+  }
+
+  const currentInput = () => ({
+    title: title.trim(),
+    type,
+    startupId: startupId || undefined,
+    organizationName: organizationName.trim(),
+    location: location.trim() || undefined,
+    remote,
+    description: description.trim(),
+    requirements,
+    compensation: compensation.trim() || undefined,
+  })
+
+  const createMutation = useMutation({
+    mutationFn: () => postOpportunity(currentInput()),
+    onSuccess: (opp) => {
+      setPublished(opp)
+      setStep('success')
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not publish this opportunity'),
+  })
+
+  const updateMutation = useMutation({
+    mutationFn: () => updateOpportunity(id!, currentInput()),
+    onSuccess: (opp) => {
+      toast.success('Opportunity updated')
+      navigate(`/opportunities/${opp.id}`)
+    },
+    onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not update this opportunity'),
+  })
+
+  function handleSubmit(e: FormEvent) {
+    e.preventDefault()
+    if (!title.trim() || !organizationName.trim() || !description.trim()) {
+      toast.error('Fill in the required fields first')
+      return
+    }
+    if (isEdit) {
+      updateMutation.mutate()
+    } else {
+      setStep('preview')
+    }
+  }
+
+  if ((isEdit && (existingLoading || !prefilled)) || (!isEdit && startupsLoading)) {
+    return (
+      <div className="max-w-2xl mx-auto flex flex-col gap-4">
+        <Skeleton className="h-10 w-2/3 rounded-lg" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
+      </div>
+    )
+  }
+
+  if (step === 'success' && published) {
+    return (
+      <div className="max-w-lg mx-auto text-center py-16 flex flex-col items-center gap-4">
+        <div className="flex size-14 items-center justify-center rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+          <CheckCircle2 className="size-7" />
+        </div>
+        <h1 className="text-xl font-bold text-fg">Opportunity published</h1>
+        <p className="text-sm text-fg-muted">Your opportunity is now visible to people on Nukkad.</p>
+        <div className="flex gap-3 mt-2">
+          <Button variant="secondary" onClick={() => navigate('/opportunities')}>
+            Back to Opportunities
+          </Button>
+          <Button onClick={() => navigate(`/opportunities/${published.id}`)}>View Opportunity</Button>
+        </div>
+      </div>
+    )
+  }
+
+  if (step === 'preview') {
+    const preview = currentInput()
+    return (
+      <div className="max-w-2xl mx-auto">
+        <PageHeader title="Preview" description="This is how your opportunity will appear to other members." />
+        <Card className="rounded-2xl border border-border/80 shadow-xs p-6 sm:p-7 flex flex-col gap-4">
+          <Badge tone="neutral">{preview.type}</Badge>
+          <div>
+            <h2 className="text-xl font-black text-fg tracking-tight">{preview.title || 'Untitled opportunity'}</h2>
+            <p className="text-sm text-fg-muted flex items-center gap-1.5 mt-1 font-medium">
+              <Briefcase className="size-3.5" /> {preview.organizationName}
+            </p>
+            {(preview.location || preview.remote) && (
+              <p className="text-xs text-fg-muted flex items-center gap-1.5 mt-1">
+                <MapPin className="size-3.5" /> {preview.location}
+                {preview.remote && ' · Remote friendly'}
+              </p>
+            )}
+          </div>
+          <p className="text-sm text-fg-secondary leading-relaxed whitespace-pre-wrap">{preview.description}</p>
+          {preview.requirements && preview.requirements.length > 0 && (
+            <ul className="list-disc list-inside text-sm text-fg-secondary space-y-1">
+              {preview.requirements.map((req) => (
+                <li key={req}>{req}</li>
+              ))}
+            </ul>
+          )}
+          {preview.compensation && (
+            <p className="text-xs font-semibold text-fg-secondary flex items-center gap-1.5 pt-3 border-t border-border/60">
+              <IndianRupee className="size-3.5" /> {preview.compensation}
+            </p>
+          )}
+        </Card>
+        <div className="flex items-center justify-end gap-3 pt-5">
+          <Button variant="ghost" onClick={() => setStep('form')}>
+            Back to edit
+          </Button>
+          <Button size="lg" isLoading={createMutation.isPending} onClick={() => createMutation.mutate()}>
+            Publish Opportunity
+          </Button>
+        </div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="max-w-2xl mx-auto">
+      <PageHeader
+        title={isEdit ? 'Edit opportunity' : 'Post an opportunity'}
+        description={
+          isEdit
+            ? 'Update the details below.'
+            : 'Share a job, internship, founding role, or co-founder opening with the Nukkad community.'
+        }
+      />
+      <Card className="rounded-2xl border border-border/80 shadow-sm p-5 sm:p-6">
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          <Select label="Opportunity type" required value={type} onChange={(e) => setType(e.target.value as OpportunityType)}>
+            {TYPES.map((t) => (
+              <option key={t} value={t}>
+                {t}
+              </option>
+            ))}
+          </Select>
+
+          <Input label="Title" required value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. AI/ML Intern" maxLength={200} />
+
+          {foundedStartups && foundedStartups.length > 0 && (
+            <Select
+              label="Startup"
+              hint="Optional — attach this to one of your startups"
+              value={startupId}
+              onChange={(e) => selectStartup(e.target.value)}
+            >
+              <option value="">No startup — post as an organization</option>
+              {foundedStartups.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name}
+                </option>
+              ))}
+            </Select>
+          )}
+
+          <Input
+            label="Organization"
+            required
+            value={organizationName}
+            onChange={(e) => setOrganizationName(e.target.value)}
+            placeholder="e.g. ABC Technologies"
+            maxLength={200}
+          />
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input label="Location" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Bengaluru" />
+            <div className="flex items-end pb-2.5">
+              <label className="flex items-center gap-2.5 text-sm text-fg cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={remote}
+                  onChange={(e) => setRemote(e.target.checked)}
+                  className="size-4 rounded border-border accent-brand-600"
+                />
+                Remote available
+              </label>
+            </div>
+          </div>
+
+          <Textarea
+            label="Description"
+            required
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Describe the role…"
+            rows={5}
+          />
+
+          <div>
+            <p className="text-sm font-medium text-fg mb-1.5">Requirements</p>
+            <TagInput value={requirements} onChange={setRequirements} placeholder="Add a requirement and press Enter…" />
+          </div>
+
+          <Input
+            label="Compensation"
+            hint="Optional"
+            value={compensation}
+            onChange={(e) => setCompensation(e.target.value)}
+            placeholder="e.g. ₹20,000 – ₹30,000/month"
+          />
+
+          <div className="flex items-center justify-end gap-3 pt-2 mt-2 border-t border-border/60">
+            <Button variant="ghost" type="button" onClick={() => navigate(isEdit ? `/opportunities/${id}` : '/opportunities')}>
+              Cancel
+            </Button>
+            <Button type="submit" size="lg" isLoading={updateMutation.isPending}>
+              {isEdit ? 'Save changes' : 'Preview'}
+            </Button>
+          </div>
+        </form>
+      </Card>
+    </div>
+  )
+}
