@@ -22,6 +22,7 @@ import {
   Crown,
   Pencil,
   Undo2,
+  Play,
 } from 'lucide-react'
 import {
   useConversations,
@@ -69,6 +70,7 @@ function SharedPostPreview({ message, conversationId }: { message: Message; conv
   const post = message.sharedPost
   const { data: author } = useUser(post?.authorId)
   const image = post?.attachments.find((a) => a.kind === 'image')
+  const video = !image ? post?.attachments.find((a) => a.kind === 'video') : undefined
 
   if (!post) {
     return (
@@ -86,6 +88,18 @@ function SharedPostPreview({ message, conversationId }: { message: Message; conv
       className="block w-64 max-w-full overflow-hidden rounded-xl border border-border-subtle bg-surface hover:bg-surface-hover transition-colors"
     >
       {image && <img src={image.url} alt="" className="h-40 w-full object-cover" />}
+      {video && (
+        // No `controls`/click-to-play here — the whole card is a Link to the real post, matching
+        // the feed's own player; this is just a poster-style preview with a play affordance.
+        <div className="relative h-40 w-full bg-black">
+          <video src={video.url} muted playsInline preload="metadata" className="size-full object-cover" />
+          <span className="absolute inset-0 flex items-center justify-center">
+            <span className="flex size-9 items-center justify-center rounded-full bg-black/50 backdrop-blur-xs">
+              <Play className="size-4 text-white fill-white ml-0.5" />
+            </span>
+          </span>
+        </div>
+      )}
       <div className="flex items-center gap-2 px-3 pt-2.5">
         <Avatar src={author?.avatarUrl} name={author?.name ?? ''} size="xs" />
         <span className="text-xs font-semibold text-fg truncate">{author?.name}</span>
