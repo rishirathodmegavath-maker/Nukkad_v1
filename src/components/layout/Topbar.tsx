@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Menu, Search, X, Bell, MessageSquare, Sun, Moon, User, Settings, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react'
+import { Menu, Search, X, Bell, MessageSquare, Sun, Moon, User, Settings, LogOut } from 'lucide-react'
 import { useUiStore } from '@/store/ui.store'
 import { useThemeStore } from '@/store/theme.store'
 import { useAuthStore } from '@/store/auth.store'
@@ -25,8 +25,6 @@ function NotificationDot({ count }: { count: number }) {
 export function Topbar() {
   const navigate = useNavigate()
   const setMobileNavOpen = useUiStore((s) => s.setMobileNavOpen)
-  const sidebarCollapsed = useUiStore((s) => s.sidebarCollapsed)
-  const toggleSidebar = useUiStore((s) => s.toggleSidebar)
   const theme = useThemeStore((s) => s.theme)
   const setThemePreference = useThemeStore((s) => s.setThemePreference)
   const toggleTheme = () => setThemePreference(theme === 'dark' ? 'light' : 'dark')
@@ -54,15 +52,6 @@ export function Topbar() {
         )}
       >
         <Menu className="size-5" />
-      </button>
-
-      {/* Desktop Sidebar Toggle Button */}
-      <button
-        onClick={toggleSidebar}
-        aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-        className="hidden lg:flex size-9 items-center justify-center rounded-xl text-fg-secondary hover:bg-surface-hover hover:text-fg cursor-pointer transition-colors"
-      >
-        {sidebarCollapsed ? <PanelLeftOpen className="size-4.5" /> : <PanelLeftClose className="size-4.5" />}
       </button>
 
       <GlobalSearchBox variant="desktop" />

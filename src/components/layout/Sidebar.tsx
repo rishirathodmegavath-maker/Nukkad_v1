@@ -80,7 +80,7 @@ export function DesktopSidebar() {
       <div
         className={cn(
           'flex items-center h-16 shrink-0 border-b border-border/60 transition-all',
-          collapsed ? 'justify-center px-2' : 'justify-between px-5',
+          collapsed ? 'justify-center px-2' : 'px-5',
         )}
       >
         <Link to="/" className="flex items-center gap-2.5 min-w-0 rounded-lg transition-opacity hover:opacity-80" aria-label="Go to home">
@@ -91,15 +91,6 @@ export function DesktopSidebar() {
             </span>
           )}
         </Link>
-        {!collapsed && (
-          <button
-            onClick={toggleSidebar}
-            aria-label="Collapse sidebar"
-            className="flex size-8 items-center justify-center rounded-lg text-fg-muted hover:text-fg hover:bg-surface-hover cursor-pointer transition-colors"
-          >
-            <PanelLeftClose className="size-4" />
-          </button>
-        )}
       </div>
 
       <div className="flex-1 overflow-y-auto py-3 no-scrollbar">
