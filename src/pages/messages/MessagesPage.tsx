@@ -1482,8 +1482,9 @@ export default function MessagesPage() {
   const [showCreateGroup, setShowCreateGroup] = useState(false)
   const [filter, setFilter] = useState<'all' | 'direct' | 'group'>('all')
 
-  const directCount = conversations?.filter((c) => c.type !== 'GROUP').length ?? 0
-  const groupCount = conversations?.filter((c) => c.type === 'GROUP').length ?? 0
+  const directUnread = conversations?.filter((c) => c.type !== 'GROUP' && c.unreadCount > 0).length ?? 0
+  const groupUnread = conversations?.filter((c) => c.type === 'GROUP' && c.unreadCount > 0).length ?? 0
+  const totalUnread = directUnread + groupUnread
   const filteredConversations = useMemo(() => {
     if (!conversations || filter === 'all') return conversations
     return conversations.filter((c) => (filter === 'group' ? c.type === 'GROUP' : c.type !== 'GROUP'))
@@ -1533,9 +1534,9 @@ export default function MessagesPage() {
           <div className="px-2 pb-2.5">
             <PillTabs
               items={[
-                { key: 'all', label: 'All', count: conversations.length },
-                { key: 'direct', label: 'Direct', count: directCount },
-                { key: 'group', label: 'Groups', count: groupCount },
+                { key: 'all', label: 'All', count: totalUnread > 0 ? totalUnread : undefined },
+                { key: 'direct', label: 'Direct', count: directUnread > 0 ? directUnread : undefined },
+                { key: 'group', label: 'Groups', count: groupUnread > 0 ? groupUnread : undefined },
               ]}
               value={filter}
               onChange={(k) => setFilter(k as 'all' | 'direct' | 'group')}
