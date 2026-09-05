@@ -30,7 +30,6 @@ import {
   Layers,
   Activity,
   User as UserIcon,
-  Sparkles,
 } from 'lucide-react'
 import {
   getUser,
@@ -1577,27 +1576,62 @@ function ProfileCompletenessBanner({ user }: { user: User }) {
   const score = user.profileCompleteness ?? 0
   if (score >= 100) return null
 
+  const radius = 25
+  const circumference = 2 * Math.PI * radius
+  const dashOffset = circumference * (1 - score / 100)
+
   return (
     <>
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-5 py-4 rounded-2xl border border-border/80 bg-surface-sunken/60 hover:bg-surface-sunken transition-all shadow-xs mb-3">
-        <div className="flex items-center gap-3.5 min-w-0 flex-1">
-          <div className="flex size-9 items-center justify-center rounded-xl bg-brand-500/10 text-brand-600 dark:text-brand-400 shrink-0 border border-brand-500/20">
-            <Sparkles className="size-4.5" />
+      <div className="flex flex-col gap-4 px-5 py-4 rounded-2xl border border-border/80 bg-surface-sunken/60 hover:bg-surface-sunken transition-all shadow-xs mb-3">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4 min-w-0 flex-1">
+            <svg width="58" height="58" viewBox="0 0 58 58" className="shrink-0">
+              <circle cx="29" cy="29" r={radius} fill="none" strokeWidth="5" className="stroke-border" />
+              <circle
+                cx="29"
+                cy="29"
+                r={radius}
+                fill="none"
+                strokeWidth="5"
+                strokeLinecap="round"
+                strokeDasharray={circumference}
+                strokeDashoffset={dashOffset}
+                transform="rotate(-90 29 29)"
+                stroke="url(#profile-completeness-gradient)"
+                className="transition-[stroke-dashoffset] duration-500"
+              />
+              <defs>
+                <linearGradient id="profile-completeness-gradient" x1="0%" y1="100%" x2="100%" y2="0%">
+                  <stop offset="0%" stopColor="var(--color-brand-500)" />
+                  <stop offset="100%" stopColor="var(--color-success-500)" />
+                </linearGradient>
+              </defs>
+              <text x="29" y="30" textAnchor="middle" dominantBaseline="middle" fontSize="14" fontWeight="800" className="fill-fg">
+                {score}%
+              </text>
+            </svg>
+            <div className="min-w-0 flex-1">
+              <p className="font-bold text-sm sm:text-base text-fg">
+                Profile is {score}% complete
+              </p>
+              <p className="text-xs sm:text-sm text-fg-muted font-medium mt-0.5">
+                Add projects, achievements, and social links to reach 100%.
+              </p>
+            </div>
           </div>
-          <div className="min-w-0 flex-1">
-            <p className="font-bold text-sm sm:text-base text-fg">
-              Profile is {score}% complete
-            </p>
-            <p className="text-xs sm:text-sm text-fg-muted font-medium mt-0.5 truncate">
-              Add projects, achievements, and social links to reach 100%.
-            </p>
+
+          <div className="shrink-0 flex items-center justify-end">
+            <Button size="sm" variant="primary" onClick={() => setOpen(true)} className="rounded-full px-5 font-bold">
+              Complete Profile
+            </Button>
           </div>
         </div>
 
-        <div className="shrink-0 flex items-center justify-end">
-          <Button size="sm" variant="primary" onClick={() => setOpen(true)} className="rounded-full px-5 font-bold">
-            Complete Profile
-          </Button>
+        <div className="h-1.5 w-full rounded-full bg-surface overflow-hidden">
+          <div
+            className="h-full rounded-full transition-[width] duration-500"
+            style={{ width: `${score}%`, background: 'linear-gradient(90deg, var(--color-brand-500), var(--color-success-500))' }}
+          />
         </div>
       </div>
 
