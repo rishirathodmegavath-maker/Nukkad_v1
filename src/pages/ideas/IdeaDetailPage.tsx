@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Users, Sparkles, ArrowRight, Check, X, Star, ChevronRight, MessageSquare, Pencil } from 'lucide-react'
+import { Users, Sparkles, ArrowRight, Check, X, Star, ChevronRight, MessageSquare, Pencil, Trash2 } from 'lucide-react'
 import { getOrCreateConversationWith } from '@/services/messages.service'
 import {
   getIdea,
@@ -13,6 +13,7 @@ import {
   withdrawInterest,
   shortlistInterest,
   rejectInterest,
+  deleteIdea,
 } from '@/services/ideas.service'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { useUser } from '@/hooks/useUser'
@@ -22,6 +23,7 @@ import { Button } from '@/components/ui/Button'
 import { Avatar } from '@/components/ui/Avatar'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/EmptyState'
+import { Modal } from '@/components/ui/Modal'
 import { ExpressInterestModal } from '@/components/domain/ExpressInterestModal'
 import { IdeaEditModal } from '@/components/domain/IdeaEditModal'
 import { MatchReasons } from '@/components/domain/MatchReasons'
@@ -84,6 +86,7 @@ export default function IdeaDetailPage() {
   const queryClient = useQueryClient()
   const [modalOpen, setModalOpen] = useState(false)
   const [editOpen, setEditOpen] = useState(false)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const { data: currentUser } = useCurrentUser()
 
   const { data: idea, isLoading, isError, refetch } = useQuery({
@@ -169,6 +172,19 @@ export default function IdeaDetailPage() {
     },
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteIdea(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['ideas'] })
+      toast.info('Idea deleted')
+      navigate('/ideas')
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Could not delete this idea')
+      setConfirmDeleteOpen(false)
+    },
+  })
+
   if (isLoading) {
     return (
       <div className="flex flex-col gap-4">
@@ -209,9 +225,21 @@ export default function IdeaDetailPage() {
               <Badge tone="neutral">{idea.category}</Badge>
               <span className="text-xs text-fg-muted ml-auto">{formatRelativeTime(idea.createdAt)}</span>
               {isCreator && (
-                <Button variant="secondary" size="sm" leftIcon={<Pencil className="size-3.5" />} onClick={() => setEditOpen(true)}>
-                  Edit
-                </Button>
+                <>
+                  <Button variant="secondary" size="sm" leftIcon={<Pencil className="size-3.5" />} onClick={() => setEditOpen(true)}>
+                    Edit
+                  </Button>
+                  {!idea.startupId && (
+                    <Button
+                      variant="danger-subtle"
+                      size="sm"
+                      leftIcon={<Trash2 className="size-3.5" />}
+                      onClick={() => setConfirmDeleteOpen(true)}
+                    >
+                      Delete
+                    </Button>
+                  )}
+                </>
               )}
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-fg tracking-tight leading-tight mb-4">{idea.title}</h1>
@@ -458,6 +486,26 @@ export default function IdeaDetailPage() {
       onClose={() => setModalOpen(false)}
     />
     <IdeaEditModal open={editOpen} onClose={() => setEditOpen(false)} idea={idea} />
+
+    <Modal
+      open={confirmDeleteOpen}
+      onClose={() => setConfirmDeleteOpen(false)}
+      title="Delete this idea?"
+      description={`"${idea.title}" will be permanently removed, along with its team and interest history. This action cannot be undone.`}
+      size="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={() => setConfirmDeleteOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="danger" isLoading={deleteMutation.isPending} onClick={() => deleteMutation.mutate()}>
+            Delete idea
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-fg-muted">Are you sure you want to permanently delete this idea?</p>
+    </Modal>
   </div>
 )
 }

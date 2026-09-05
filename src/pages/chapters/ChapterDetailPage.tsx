@@ -1,5 +1,5 @@
 import { useRef, useState, type ChangeEvent } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Users, Crown, Plus, ChevronRight, CheckCircle2, Camera, Trash2, Pencil, UserPlus, X } from 'lucide-react'
 import {
@@ -8,6 +8,7 @@ import {
   uploadChapterCover,
   removeChapterCover,
   removeChapterMember,
+  deleteChapter,
 } from '@/services/chapters.service'
 import { listUsers } from '@/services/users.service'
 import { listIdeas } from '@/services/ideas.service'
@@ -41,8 +42,10 @@ type TabKey = 'members' | 'ideas' | 'startups' | 'opportunities' | 'events' | 'r
 
 export default function ChapterDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [tab, setTab] = useState<TabKey>('members')
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
 
   const { data: chapter, isLoading, isError, refetch } = useQuery({
     queryKey: ['chapter', id],
@@ -74,6 +77,19 @@ export default function ChapterDetailPage() {
       toast.success('Removed from chapter')
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not remove member'),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteChapter(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['chapters'] })
+      toast.info('Chapter deleted')
+      navigate('/chapters')
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Could not delete this chapter')
+      setConfirmDeleteOpen(false)
+    },
   })
 
   const coverInputRef = useRef<HTMLInputElement>(null)
@@ -238,9 +254,19 @@ export default function ChapterDetailPage() {
           </div>
           <div className="flex flex-col items-end gap-2 shrink-0">
             {isPresident && (
-              <Button variant="secondary" size="sm" leftIcon={<Pencil className="size-3.5" />} onClick={() => setEditOpen(true)}>
-                Edit chapter
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" size="sm" leftIcon={<Pencil className="size-3.5" />} onClick={() => setEditOpen(true)}>
+                  Edit chapter
+                </Button>
+                <Button
+                  variant="danger-subtle"
+                  size="sm"
+                  leftIcon={<Trash2 className="size-3.5" />}
+                  onClick={() => setConfirmDeleteOpen(true)}
+                >
+                  Delete
+                </Button>
+              </div>
             )}
             {isMember ? (
               <span className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800 text-xs font-bold shadow-2xs">
@@ -450,6 +476,25 @@ export default function ChapterDetailPage() {
         open={addMemberOpen}
         onClose={() => setAddMemberOpen(false)}
       />
+      <Modal
+        open={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        title="Delete this chapter?"
+        description={`"${chapter.name}" can only be deleted once it has no other members and no linked ideas, startups, opportunities, events, or resources.`}
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" isLoading={deleteMutation.isPending} onClick={() => deleteMutation.mutate()}>
+              Delete chapter
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-fg-secondary">Are you sure you want to permanently delete this chapter?</p>
+      </Modal>
     </div>
   )
 }

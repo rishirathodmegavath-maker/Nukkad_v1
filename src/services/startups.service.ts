@@ -116,6 +116,10 @@ export async function updateStartup(id: string, input: UpdateStartupInput): Prom
   return mapStartup(await apiClient.put<StartupDto>(`/startups/${id}`, input))
 }
 
+export async function deleteStartup(id: string): Promise<void> {
+  await apiClient.delete(`/startups/${id}`)
+}
+
 export async function uploadStartupLogo(id: string, file: File): Promise<Startup> {
   return mapStartup(await uploadFile<StartupDto>(`/startups/${id}/logo`, file))
 }

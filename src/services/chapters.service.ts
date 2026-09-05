@@ -81,6 +81,10 @@ export async function updateChapter(id: string, input: UpdateChapterInput): Prom
   return mapChapter(await apiClient.put<ChapterDto>(`/chapters/${id}`, input))
 }
 
+export async function deleteChapter(id: string): Promise<void> {
+  await apiClient.delete(`/chapters/${id}`)
+}
+
 export async function addChapterMember(chapterId: string, userId: string): Promise<User> {
   return mapUser(await apiClient.post<UserDto>(`/chapters/${chapterId}/members/${userId}`))
 }

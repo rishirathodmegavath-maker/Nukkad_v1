@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { useParams, Link } from 'react-router-dom'
-import { useQuery } from '@tanstack/react-query'
-import { Pencil, Globe, ChevronRight } from 'lucide-react'
-import { getInvestor } from '@/services/investors.service'
+import { useParams, Link, useNavigate } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { Pencil, Trash2, Globe, ChevronRight } from 'lucide-react'
+import { getInvestor, deleteInvestorProfile } from '@/services/investors.service'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -10,20 +10,38 @@ import { Avatar } from '@/components/ui/Avatar'
 import { Button } from '@/components/ui/Button'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/EmptyState'
+import { Modal } from '@/components/ui/Modal'
 import { InvestorProfileEditModal } from '@/components/domain/InvestorProfileEditModal'
 import { IntroRequestModal } from '@/components/domain/IntroRequestModal'
 import { formatCurrency } from '@/lib/utils'
+import { toast } from '@/store/toast.store'
 
 export default function InvestorProfilePage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [editOpen, setEditOpen] = useState(false)
   const [introOpen, setIntroOpen] = useState(false)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const { data: currentUser } = useCurrentUser()
 
   const { data: investor, isLoading, isError, refetch } = useQuery({
     queryKey: ['investor', id],
     queryFn: () => getInvestor(id!),
     enabled: !!id,
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteInvestorProfile(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['investors'] })
+      toast.info('Investor profile deleted')
+      navigate('/investors')
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Could not delete this investor profile')
+      setConfirmDeleteOpen(false)
+    },
   })
 
   if (isLoading) {
@@ -74,9 +92,19 @@ export default function InvestorProfilePage() {
             </div>
           </div>
           {investor.canManage ? (
-            <Button variant="secondary" size="sm" leftIcon={<Pencil className="size-3.5" />} onClick={() => setEditOpen(true)}>
-              Edit
-            </Button>
+            <div className="flex items-center gap-2 shrink-0">
+              <Button variant="secondary" size="sm" leftIcon={<Pencil className="size-3.5" />} onClick={() => setEditOpen(true)}>
+                Edit
+              </Button>
+              <Button
+                variant="danger-subtle"
+                size="sm"
+                leftIcon={<Trash2 className="size-3.5" />}
+                onClick={() => setConfirmDeleteOpen(true)}
+              >
+                Delete
+              </Button>
+            </div>
           ) : (
             !isOwnProfile && <Button size="sm" onClick={() => setIntroOpen(true)}>Request introduction</Button>
           )}
@@ -140,6 +168,26 @@ export default function InvestorProfilePage() {
       recipientName={name}
       direction="FOUNDER_TO_INVESTOR"
     />
+
+    <Modal
+      open={confirmDeleteOpen}
+      onClose={() => setConfirmDeleteOpen(false)}
+      title="Delete this investor profile?"
+      description="This removes your investor listing and any pending introduction requests tied to it. This action cannot be undone."
+      size="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={() => setConfirmDeleteOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="danger" isLoading={deleteMutation.isPending} onClick={() => deleteMutation.mutate()}>
+            Delete profile
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-fg-muted">Are you sure you want to permanently delete your investor profile?</p>
+    </Modal>
   </div>
 )
 }

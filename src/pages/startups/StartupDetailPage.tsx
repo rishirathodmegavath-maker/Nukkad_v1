@@ -1,5 +1,5 @@
 import { useRef, useState, type ChangeEvent } from 'react'
-import { useParams, Link } from 'react-router-dom'
+import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Heart, Users, TrendingUp, Briefcase, Pencil, Check, X, UserPlus, Camera, Trash2, ChevronRight } from 'lucide-react'
 import {
@@ -15,6 +15,7 @@ import {
   removeStartupTeamMember,
   uploadStartupLogo,
   removeStartupLogo,
+  deleteStartup,
   getStartupUpdates,
   getStartupRoles,
 } from '@/services/startups.service'
@@ -28,6 +29,7 @@ import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState, EmptyState } from '@/components/ui/EmptyState'
 import { DropdownMenu, DropdownItem } from '@/components/ui/DropdownMenu'
 import { ImageCropModal } from '@/components/ui/ImageCropModal'
+import { Modal } from '@/components/ui/Modal'
 import { UploadSpinnerOverlay, type UploadPhase } from '@/components/ui/UploadButton'
 import { JoinStartupModal } from '@/components/domain/JoinStartupModal'
 import { StartupEditModal } from '@/components/domain/StartupEditModal'
@@ -92,11 +94,13 @@ function TeamMemberRow({
 
 export default function StartupDetailPage() {
   const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [joinModalOpen, setJoinModalOpen] = useState(false)
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [addTeammateModalOpen, setAddTeammateModalOpen] = useState(false)
   const [fundraiseModalOpen, setFundraiseModalOpen] = useState(false)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
   const logoInputRef = useRef<HTMLInputElement>(null)
   const [logoPhase, setLogoPhase] = useState<UploadPhase>('idle')
   const [pendingLogoFile, setPendingLogoFile] = useState<File | null>(null)
@@ -234,6 +238,19 @@ export default function StartupDetailPage() {
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not remove teammate'),
   })
 
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteStartup(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['startups'] })
+      toast.info('Startup deleted')
+      navigate('/startups')
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Could not delete this startup')
+      setConfirmDeleteOpen(false)
+    },
+  })
+
   if (isLoading) {
     return (
       <div className="flex flex-col gap-4">
@@ -305,9 +322,19 @@ export default function StartupDetailPage() {
               </div>
               <div className="flex items-center gap-2 shrink-0">
                 {isFounder && (
-                  <Button variant="secondary" size="sm" leftIcon={<Pencil className="size-3.5" />} onClick={() => setEditModalOpen(true)}>
-                    Edit
-                  </Button>
+                  <>
+                    <Button variant="secondary" size="sm" leftIcon={<Pencil className="size-3.5" />} onClick={() => setEditModalOpen(true)}>
+                      Edit
+                    </Button>
+                    <Button
+                      variant="danger-subtle"
+                      size="sm"
+                      leftIcon={<Trash2 className="size-3.5" />}
+                      onClick={() => setConfirmDeleteOpen(true)}
+                    >
+                      Delete
+                    </Button>
+                  </>
                 )}
                 <Button
                   variant="secondary"
@@ -598,6 +625,26 @@ export default function StartupDetailPage() {
           />
         </>
       )}
+
+      <Modal
+        open={confirmDeleteOpen}
+        onClose={() => setConfirmDeleteOpen(false)}
+        title="Delete this startup?"
+        description={`"${startup.name}" will be permanently removed, along with its team, updates, and open roles. This action cannot be undone.`}
+        size="sm"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setConfirmDeleteOpen(false)}>
+              Cancel
+            </Button>
+            <Button variant="danger" isLoading={deleteMutation.isPending} onClick={() => deleteMutation.mutate()}>
+              Delete startup
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-fg-muted">Are you sure you want to permanently delete this startup?</p>
+      </Modal>
     </div>
   )
 }

@@ -104,6 +104,10 @@ export async function updateIdea(id: string, payload: UpdateIdeaPayload): Promis
   return mapIdea(dto)
 }
 
+export async function deleteIdea(id: string): Promise<void> {
+  await apiClient.delete(`/ideas/${id}`)
+}
+
 interface IdeaInterestDto {
   id: string
   ideaId: string

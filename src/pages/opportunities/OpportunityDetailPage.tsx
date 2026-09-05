@@ -1,8 +1,8 @@
 import { useState } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { MapPin, Briefcase, IndianRupee, Users, MessageSquare, ListChecks, ChevronRight, Lock, LockOpen, Pencil } from 'lucide-react'
-import { getOpportunity, expressInterestInOpportunity, withdrawApplication, closeOpportunity, reopenOpportunity } from '@/services/opportunities.service'
+import { MapPin, Briefcase, IndianRupee, Users, MessageSquare, ListChecks, ChevronRight, Lock, LockOpen, Pencil, Trash2 } from 'lucide-react'
+import { getOpportunity, expressInterestInOpportunity, withdrawApplication, closeOpportunity, reopenOpportunity, deleteOpportunity } from '@/services/opportunities.service'
 import { getOrCreateConversationWith } from '@/services/messages.service'
 import { useUser } from '@/hooks/useUser'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/Button'
 import { Avatar } from '@/components/ui/Avatar'
 import { Skeleton } from '@/components/ui/Skeleton'
 import { ErrorState } from '@/components/ui/EmptyState'
+import { Modal } from '@/components/ui/Modal'
 import { formatRelativeTime } from '@/lib/utils'
 import { toast } from '@/store/toast.store'
 import type { ApplicationStatus } from '@/types'
@@ -40,6 +41,7 @@ export default function OpportunityDetailPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [applyModalOpen, setApplyModalOpen] = useState(false)
+  const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false)
 
   const { data: opp, isLoading, isError, refetch } = useQuery({
     queryKey: ['opportunity', id],
@@ -90,6 +92,19 @@ export default function OpportunityDetailPage() {
       toast.success('Opportunity reopened')
     },
     onError: (err) => toast.error(err instanceof Error ? err.message : 'Could not reopen this opportunity'),
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: () => deleteOpportunity(id!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['opportunities'] })
+      toast.info('Opportunity deleted')
+      navigate('/opportunities')
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : 'Could not delete this opportunity')
+      setConfirmDeleteOpen(false)
+    },
   })
 
   if (isLoading) {
@@ -199,6 +214,14 @@ export default function OpportunityDetailPage() {
                   Close opportunity
                 </Button>
               )}
+              <Button
+                className="w-full"
+                variant="danger-subtle"
+                leftIcon={<Trash2 className="size-4" />}
+                onClick={() => setConfirmDeleteOpen(true)}
+              >
+                Delete
+              </Button>
             </div>
           ) : usesInterest ? (
             <Button
@@ -276,6 +299,26 @@ export default function OpportunityDetailPage() {
       open={applyModalOpen}
       onClose={() => setApplyModalOpen(false)}
     />
+
+    <Modal
+      open={confirmDeleteOpen}
+      onClose={() => setConfirmDeleteOpen(false)}
+      title="Delete this opportunity?"
+      description={`"${opp.title}" will be permanently removed, along with its applications and interest history. This action cannot be undone.`}
+      size="sm"
+      footer={
+        <>
+          <Button variant="ghost" onClick={() => setConfirmDeleteOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="danger" isLoading={deleteMutation.isPending} onClick={() => deleteMutation.mutate()}>
+            Delete opportunity
+          </Button>
+        </>
+      }
+    >
+      <p className="text-sm text-fg-muted">Are you sure you want to permanently delete this opportunity?</p>
+    </Modal>
   </div>
 )
 }

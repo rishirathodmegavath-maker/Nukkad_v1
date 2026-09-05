@@ -117,6 +117,10 @@ export async function updateOpportunity(id: string, input: PostOpportunityInput)
   )
 }
 
+export async function deleteOpportunity(id: string): Promise<void> {
+  await apiClient.delete(`/opportunities/${id}`)
+}
+
 export async function closeOpportunity(id: string): Promise<Opportunity> {
   return mapOpportunity(await apiClient.post<OpportunityDto>(`/opportunities/${id}/close`))
 }
