@@ -1,4 +1,4 @@
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useParams, useNavigate, useLocation, Link } from 'react-router-dom'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import {
@@ -11,6 +11,7 @@ import {
   UserMinus,
   MessageSquare,
   ChevronDown,
+  ChevronRight,
   Pencil,
   Camera,
   Trash2,
@@ -1571,8 +1572,23 @@ function LinksCard({ user, isSelf, onEdit }: { user: User; isSelf: boolean; onEd
   )
 }
 
-function ProfileCompletenessBanner({ user }: { user: User }) {
-  const [open, setOpen] = useState(false)
+function ProfileCompletenessBanner({
+  user,
+  open,
+  onOpenChange,
+  onEditProfile,
+  onUploadPhoto,
+  onUploadCover,
+  onGoToSection,
+}: {
+  user: User
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onEditProfile: () => void
+  onUploadPhoto: () => void
+  onUploadCover: () => void
+  onGoToSection: (tab: TabType, sectionId: string) => void
+}) {
   const score = user.profileCompleteness ?? 0
   if (score >= 100) return null
 
@@ -1621,7 +1637,7 @@ function ProfileCompletenessBanner({ user }: { user: User }) {
           </div>
 
           <div className="shrink-0 flex items-center justify-end">
-            <Button size="sm" variant="primary" onClick={() => setOpen(true)} className="rounded-full px-5 font-bold">
+            <Button size="sm" variant="primary" onClick={() => onOpenChange(true)} className="rounded-full px-5 font-bold">
               Complete Profile
             </Button>
           </div>
@@ -1635,32 +1651,56 @@ function ProfileCompletenessBanner({ user }: { user: User }) {
         </div>
       </div>
 
-      <ProfileCompletenessModal open={open} onClose={() => setOpen(false)} user={user} />
+      <ProfileCompletenessModal
+        open={open}
+        onClose={() => onOpenChange(false)}
+        user={user}
+        onEditProfile={onEditProfile}
+        onUploadPhoto={onUploadPhoto}
+        onUploadCover={onUploadCover}
+        onGoToSection={onGoToSection}
+      />
     </>
   )
 }
 
+type CompletenessKey =
+  | 'PHOTO'
+  | 'COVER'
+  | 'HEADLINE'
+  | 'BIO'
+  | 'LOCATION'
+  | 'SKILLS'
+  | 'EXPERIENCE_OR_EDUCATION'
+  | 'PROJECTS'
+  | 'SOCIAL_LINKS'
+  | 'LOOKING_FOR'
+  | 'CREDENTIALS'
+
 function buildCompletenessChecklist(user: User): CompletenessItem[] {
   return [
-    { label: 'Profile photo', hint: 'Add a profile picture', done: !!user.avatarUrl },
-    { label: 'Cover photo', hint: 'Add a cover photo', done: !!user.coverUrl },
-    { label: 'Headline', hint: 'Add a professional headline', done: !!user.headline },
-    { label: 'Bio', hint: 'Write at least 20 characters about yourself', done: (user.bio?.trim().length ?? 0) >= 20 },
-    { label: 'Location', hint: 'Add your location', done: !!user.location },
-    { label: 'Skills', hint: 'Add at least 3 skills', done: (user.skills?.length ?? 0) >= 3 },
+    { key: 'PHOTO', label: 'Profile photo', hint: 'Add a profile picture', done: !!user.avatarUrl },
+    { key: 'COVER', label: 'Cover photo', hint: 'Add a cover photo', done: !!user.coverUrl },
+    { key: 'HEADLINE', label: 'Headline', hint: 'Add a professional headline', done: !!user.headline },
+    { key: 'BIO', label: 'Bio', hint: 'Write at least 20 characters about yourself', done: (user.bio?.trim().length ?? 0) >= 20 },
+    { key: 'LOCATION', label: 'Location', hint: 'Add your location', done: !!user.location },
+    { key: 'SKILLS', label: 'Skills', hint: 'Add at least 3 skills', done: (user.skills?.length ?? 0) >= 3 },
     {
+      key: 'EXPERIENCE_OR_EDUCATION',
       label: 'Experience or education',
       hint: 'Add a work experience or education entry',
       done: (user.experiences?.length ?? 0) > 0 || (user.education?.length ?? 0) > 0,
     },
-    { label: 'Projects', hint: 'Add at least one project', done: (user.projects?.length ?? 0) > 0 },
-    { label: 'Social links', hint: 'Add a social or portfolio link', done: Object.keys(user.socialLinks ?? {}).length > 0 },
+    { key: 'PROJECTS', label: 'Projects', hint: 'Add at least one project', done: (user.projects?.length ?? 0) > 0 },
+    { key: 'SOCIAL_LINKS', label: 'Social links', hint: 'Add a social or portfolio link', done: Object.keys(user.socialLinks ?? {}).length > 0 },
     {
+      key: 'LOOKING_FOR',
       label: 'Looking for / open to',
       hint: 'Set what you are looking for or open to',
       done: (user.lookingFor?.length ?? 0) > 0 || (user.openTo?.length ?? 0) > 0,
     },
     {
+      key: 'CREDENTIALS',
       label: 'Achievements, certifications, or publications',
       hint: 'Add an achievement, certification, or publication',
       done: (user.achievements?.length ?? 0) > 0 || (user.certifications?.length ?? 0) > 0 || (user.publications?.length ?? 0) > 0,
@@ -1669,29 +1709,84 @@ function buildCompletenessChecklist(user: User): CompletenessItem[] {
 }
 
 interface CompletenessItem {
+  key: CompletenessKey
   label: string
   hint: string
   done: boolean
 }
 
-function ProfileCompletenessModal({ open, onClose, user }: { open: boolean; onClose: () => void; user: User }) {
+function ProfileCompletenessModal({
+  open,
+  onClose,
+  user,
+  onEditProfile,
+  onUploadPhoto,
+  onUploadCover,
+  onGoToSection,
+}: {
+  open: boolean
+  onClose: () => void
+  user: User
+  onEditProfile: () => void
+  onUploadPhoto: () => void
+  onUploadCover: () => void
+  onGoToSection: (tab: TabType, sectionId: string) => void
+}) {
   const items = buildCompletenessChecklist(user)
+
+  function handleItemClick(key: CompletenessKey) {
+    switch (key) {
+      case 'PHOTO':
+        onUploadPhoto()
+        break
+      case 'COVER':
+        onUploadCover()
+        break
+      case 'HEADLINE':
+      case 'BIO':
+      case 'LOCATION':
+      case 'SKILLS':
+      case 'SOCIAL_LINKS':
+      case 'LOOKING_FOR':
+        onEditProfile()
+        break
+      case 'EXPERIENCE_OR_EDUCATION':
+        onGoToSection('overview', 'profile-section-experience')
+        break
+      case 'PROJECTS':
+        onGoToSection('ventures', 'profile-section-projects')
+        break
+      case 'CREDENTIALS':
+        onGoToSection('credentials', 'profile-section-achievements')
+        break
+    }
+  }
+
   return (
     <Modal open={open} onClose={onClose} title="Complete your profile" description="Strengthen your credibility across the Nukkad network." size="md">
       <div className="flex flex-col divide-y divide-border/60">
-        {items.map((item) => (
-          <div key={item.label} className="flex items-start gap-3 py-3">
-            {item.done ? (
+        {items.map((item) =>
+          item.done ? (
+            <div key={item.key} className="flex items-start gap-3 py-3">
               <CheckCircle2 className="size-5 text-emerald-500 shrink-0 mt-0.5" />
-            ) : (
-              <Circle className="size-5 text-fg-muted/60 shrink-0 mt-0.5" />
-            )}
-            <div>
-              <p className={cn('text-sm font-semibold', item.done ? 'text-fg-muted line-through' : 'text-fg')}>{item.label}</p>
-              {!item.done && <p className="text-xs text-fg-muted mt-0.5">{item.hint}</p>}
+              <p className="text-sm font-semibold text-fg-muted line-through">{item.label}</p>
             </div>
-          </div>
-        ))}
+          ) : (
+            <button
+              key={item.key}
+              type="button"
+              onClick={() => handleItemClick(item.key)}
+              className="flex items-start gap-3 py-3 w-full text-left rounded-lg -mx-2 px-2 cursor-pointer hover:bg-surface-hover transition-colors"
+            >
+              <Circle className="size-5 text-fg-muted/60 shrink-0 mt-0.5" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-fg">{item.label}</p>
+                <p className="text-xs text-fg-muted mt-0.5">{item.hint}</p>
+              </div>
+              <ChevronRight className="size-4 text-fg-muted/60 shrink-0 mt-1" />
+            </button>
+          ),
+        )}
       </div>
     </Modal>
   )
@@ -1793,6 +1888,9 @@ export default function PersonProfilePage() {
   const [privacyOpen, setPrivacyOpen] = useState(false)
   const [connectionsModalOpen, setConnectionsModalOpen] = useState(false)
   const [activeTab, setActiveTab] = useState<TabType>(() => (location.hash === '#posts' ? 'activity' : 'overview'))
+  const [completenessOpen, setCompletenessOpen] = useState(false)
+  const [returnToCompleteness, setReturnToCompleteness] = useState(false)
+  const [pendingScrollId, setPendingScrollId] = useState<string | null>(null)
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
@@ -1904,6 +2002,39 @@ export default function PersonProfilePage() {
     toast.success('Profile link copied to clipboard')
   }
 
+  // Runs after a tab switch triggered by the completeness checklist, once the target section
+  // has actually mounted in the newly-active tab.
+  useEffect(() => {
+    if (!pendingScrollId) return
+    const el = document.getElementById(pendingScrollId)
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      setPendingScrollId(null)
+    }
+  }, [pendingScrollId, activeTab])
+
+  function goToSection(tab: TabType, sectionId: string) {
+    setCompletenessOpen(false)
+    setActiveTab(tab)
+    setPendingScrollId(sectionId)
+  }
+
+  function openEditFromChecklist() {
+    setCompletenessOpen(false)
+    setReturnToCompleteness(true)
+    setEditOpen(true)
+  }
+
+  function openPhotoPickerFromChecklist() {
+    setCompletenessOpen(false)
+    fileInputRef.current?.click()
+  }
+
+  function openCoverPickerFromChecklist() {
+    setCompletenessOpen(false)
+    coverInputRef.current?.click()
+  }
+
   if (isLoading) {
     return (
       <div className="flex flex-col gap-6 max-w-[1200px] mx-auto">
@@ -1925,7 +2056,17 @@ export default function PersonProfilePage() {
 
   return (
     <div className="flex flex-col gap-6 max-w-[1200px] mx-auto pb-12">
-      {isSelf && <ProfileCompletenessBanner user={user} />}
+      {isSelf && (
+        <ProfileCompletenessBanner
+          user={user}
+          open={completenessOpen}
+          onOpenChange={setCompletenessOpen}
+          onEditProfile={openEditFromChecklist}
+          onUploadPhoto={openPhotoPickerFromChecklist}
+          onUploadCover={openCoverPickerFromChecklist}
+          onGoToSection={goToSection}
+        />
+      )}
       {isSelf && <PendingRecommendationsCard userId={user.id} />}
 
       <div className="relative rounded-2xl border border-border/80 bg-surface shadow-xs overflow-hidden">
@@ -2255,7 +2396,9 @@ export default function PersonProfilePage() {
                 </Card>
               )}
 
-              <ExperienceSection user={user} isSelf={isSelf} />
+              <div id="profile-section-experience">
+                <ExperienceSection user={user} isSelf={isSelf} />
+              </div>
               <EducationSection user={user} isSelf={isSelf} />
               <RecommendationsSection user={user} isSelf={isSelf} />
             </>
@@ -2265,13 +2408,17 @@ export default function PersonProfilePage() {
             <>
               <StartupsSection userId={user.id} />
               <IdeasSection userId={user.id} />
-              <ProjectsSection user={user} isSelf={isSelf} />
+              <div id="profile-section-projects">
+                <ProjectsSection user={user} isSelf={isSelf} />
+              </div>
             </>
           )}
 
           {activeTab === 'credentials' && (
             <>
-              <AchievementsSection user={user} isSelf={isSelf} />
+              <div id="profile-section-achievements">
+                <AchievementsSection user={user} isSelf={isSelf} />
+              </div>
               <CertificationsSection user={user} isSelf={isSelf} />
               <PublicationsSection user={user} isSelf={isSelf} />
             </>
@@ -2384,7 +2531,19 @@ export default function PersonProfilePage() {
         isPending={removeCoverMutation.isPending}
       />
 
-      {isSelf && <EditProfileModal open={editOpen} onClose={() => setEditOpen(false)} user={user} />}
+      {isSelf && (
+        <EditProfileModal
+          open={editOpen}
+          onClose={() => {
+            setEditOpen(false)
+            if (returnToCompleteness) {
+              setReturnToCompleteness(false)
+              setCompletenessOpen(true)
+            }
+          }}
+          user={user}
+        />
+      )}
       {isSelf && <PrivacySettingsModal open={privacyOpen} onClose={() => setPrivacyOpen(false)} />}
 
       <UserConnectionsModal
